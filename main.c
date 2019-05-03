@@ -68,16 +68,6 @@ int jack_callback (jack_nframes_t window_size, void *arg){
 		X_full[3*window_size + i] 	= X_full[4*window_size + i];
 		X_full[4*window_size + i] 	= X_full[5*window_size + i];
 		X_full[5*window_size + i] 	= in[i];
-
-		/*X_early[i] 					= X_early[window_size + i];
-		X_early[window_size + i] 	= X_early[2*window_size + i];
-		X_early[2*window_size + i] 	= X_early[3*window_size + i];
-		X_early[3*window_size + i] 	= in[i];
-
-		X_late[i] 					= X_late[window_size + i];
-		X_late[window_size + i] 	= X_late[2*window_size + i];
-		X_late[2*window_size + i] 	= X_early[i];
-		X_late[3*window_size + i] 	= X_early[window_size + i];*/
 	}
 
 	// ---------------------------- 1st window ------------------------------------------
@@ -85,7 +75,6 @@ int jack_callback (jack_nframes_t window_size, void *arg){
 	// FFT of the 1st window:
 	for(i = 0; i < 4*window_size; ++i){
 		i_time[i] = X_full[i]*hann[i];
-		printf("%1.10f\n", hann[i]);
 	}
 	fftw_execute(i_forward);
 	
@@ -97,8 +86,7 @@ int jack_callback (jack_nframes_t window_size, void *arg){
 	// i-FFT of the 1st window:
 	fftw_execute(o_inverse);
 	for(i = 0; i < 4*window_size; ++i){
-		X_late[i] = creal(o_time[i])/((double) window_size*4.0); //fftw3 requires normalizing its output
-		//printf("%1.10f = %1.10f\n", (double) creal(i_time[i]), (double) X_late[i]);
+		X_late[i] = creal(o_time[i])/window_size/4; //fftw3 requires normalizing its output
 	}
 
 	// ---------------------------- 2nd window ------------------------------------------
@@ -117,7 +105,7 @@ int jack_callback (jack_nframes_t window_size, void *arg){
 	// i-FFT of the 2nd window:
 	fftw_execute(o_inverse);
 	for(i = 0; i < 4*window_size; ++i){
-		X_early[i] = creal(o_time[i])/window_size/4.0; //fftw3 requires normalizing its output
+		X_early[i] = creal(o_time[i])/window_size/4; //fftw3 requires normalizing its output
 	}
 
 	// --------------------------------------------------------------------------------
@@ -195,8 +183,8 @@ int main (int argc, char *argv[]) {
 
 	sample_rate = (double)jack_get_sample_rate(client);	
 	
-	i_forward = fftw_plan_dft_1d(window_size, i_time, i_fft , FFTW_FORWARD, FFTW_MEASURE);
-	o_inverse = fftw_plan_dft_1d(window_size, o_fft , o_time, FFTW_BACKWARD, FFTW_MEASURE);
+	i_forward = fftw_plan_dft_1d(4*window_size, i_time, i_fft , FFTW_FORWARD, FFTW_MEASURE);
+	o_inverse = fftw_plan_dft_1d(4*window_size, o_fft , o_time, FFTW_BACKWARD, FFTW_MEASURE);
 
 	// - hann window
 	hann = (jack_default_audio_sample_t *) calloc(4*window_size, sizeof(jack_default_audio_sample_t)); 
