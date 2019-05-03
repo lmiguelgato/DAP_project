@@ -73,57 +73,57 @@ int jack_callback (jack_nframes_t window_size, void *arg){
 	// ---------------------------- 1st window ------------------------------------------
 
 	// FFT of the 1st window:
-	for(i = 0; i < window_size; i++){
+	for(i = 0; i < window_size; ++i){
 		i_time[i] = x_0[i];
 	}
 	fftw_execute(i_forward);
 	
 	// processing of the 1st window in frequency domain:
-	for(i = 0; i < window_size; i++){
+	for(i = 0; i < window_size; ++i){
 		o_fft[i] = i_fft[i];
 	}
 	
 	// i-FFT of the 1st window:
 	fftw_execute(o_inverse);
-	for(i = 0; i < window_size; i++){
+	for(i = 0; i < window_size; ++i){
 		x_0[i] = creal(o_time[i])/window_size; //fftw3 requires normalizing its output
 	}
 
 	// ---------------------------- 2nd window ------------------------------------------
 
 	// FFT of the 2nd window:
-	for(i = 0; i < window_size; i++){
+	for(i = 0; i < window_size; ++i){
 		i_time[i] = x_1[i];
 	}
 	fftw_execute(i_forward);
 	
 	// processing of the 2nd window in frequency domain:
-	for(i = 0; i < window_size; i++){
+	for(i = 0; i < window_size; ++i){
 		o_fft[i] = i_fft[i];
 	}
 	
 	// i-FFT of the 2nd window:
 	fftw_execute(o_inverse);
-	for(i = 0; i < window_size; i++){
+	for(i = 0; i < window_size; ++i){
 		x_1[i] = creal(o_time[i])/window_size; //fftw3 requires normalizing its output
 	}
 
 	// ---------------------------- 3rd window ------------------------------------------
 
 	// FFT of the 3rd window:
-	for(i = 0; i < window_size; i++){
+	for(i = 0; i < window_size; ++i){
 		i_time[i] = x_2[i];
 	}
 	fftw_execute(i_forward);
 	
 	// processing of the 3rd window in frequency domain:
-	for(i = 0; i < window_size; i++){
+	for(i = 0; i < window_size; ++i){
 		o_fft[i] = i_fft[i];
 	}
 	
 	// i-FFT of the 3rd window:
 	fftw_execute(o_inverse);
-	for(i = 0; i < window_size; i++){
+	for(i = 0; i < window_size; ++i){
 		x_2[i] = creal(o_time[i])/window_size; //fftw3 requires normalizing its output
 	}
 
