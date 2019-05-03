@@ -34,13 +34,12 @@ int window_size 	= 1024;			// default frame size in samples
 int overlap_size 	= 512;			// default overlap size in samples
 int num_ports 		= 2;			// number of output ports
 
-double *hann;						// buffer to store Hann window
+jack_default_audio_sample_t *hann;						// buffer to store Hann window
 
 // overlap-add registers:
-jack_default_audio_sample_t *aux;	
-jack_default_audio_sample_t *x_0;	
-jack_default_audio_sample_t *x_1;	
-jack_default_audio_sample_t *x_2;	
+jack_default_audio_sample_t *X_late;
+jack_default_audio_sample_t *X_early;
+jack_default_audio_sample_t *X_full;
 
 
 /**
@@ -53,91 +52,83 @@ jack_default_audio_sample_t *x_2;
  */
 int jack_callback (jack_nframes_t window_size, void *arg){
 
-	jack_default_audio_sample_t *in, *out1, *out2;
 	int i;
+	jack_default_audio_sample_t *in, *out1, *out2;
 	
 	in 		= (jack_default_audio_sample_t *)jack_port_get_buffer (input_port, 		window_size);
 	out1 	= (jack_default_audio_sample_t *)jack_port_get_buffer (output_ports[0], window_size);
 	out2 	= (jack_default_audio_sample_t *)jack_port_get_buffer (output_ports[1], window_size);
 
-	// succesive windowed frames (causal window, 50 % overlap-add):
-	for (int i = 0; i < window_size; ++i)
+	// shift windows to perform overlap-add:
+	for (i = 0; i < window_size; ++i)
 	{
-		aux[i+window_size] 	= in[i];
-		x_0[i] 				= aux[i]				* hann[i];
-		x_1[i]   			= aux[i+overlap_size]	* hann[i];
-		x_2[i]   			= aux[i+window_size]	* hann[i];
-		aux[i] 				= aux[i+window_size];
+		X_full[i] 					= X_full[window_size + i];
+		X_full[window_size + i] 	= X_full[2*window_size + i];
+		X_full[2*window_size + i] 	= X_full[3*window_size + i];
+		X_full[3*window_size + i] 	= X_full[4*window_size + i];
+		X_full[4*window_size + i] 	= X_full[5*window_size + i];
+		X_full[5*window_size + i] 	= in[i];
+
+		/*X_early[i] 					= X_early[window_size + i];
+		X_early[window_size + i] 	= X_early[2*window_size + i];
+		X_early[2*window_size + i] 	= X_early[3*window_size + i];
+		X_early[3*window_size + i] 	= in[i];
+
+		X_late[i] 					= X_late[window_size + i];
+		X_late[window_size + i] 	= X_late[2*window_size + i];
+		X_late[2*window_size + i] 	= X_early[i];
+		X_late[3*window_size + i] 	= X_early[window_size + i];*/
 	}
 
 	// ---------------------------- 1st window ------------------------------------------
 
 	// FFT of the 1st window:
-	for(i = 0; i < window_size; i++){
-		i_time[i] = x_0[i];
+	for(i = 0; i < 4*window_size; i++){
+		i_time[i] = X_full[i]*hann[i];
+		printf("%1.10f\n", hann[i]);
 	}
 	fftw_execute(i_forward);
 	
 	// processing of the 1st window in frequency domain:
-	for(i = 0; i < window_size; i++){
+	for(i = 0; i < 4*window_size; i++){
 		o_fft[i] = i_fft[i];
 	}
 	
 	// i-FFT of the 1st window:
 	fftw_execute(o_inverse);
-	for(i = 0; i < window_size; i++){
-		x_0[i] = creal(o_time[i])/window_size; //fftw3 requires normalizing its output
+	for(i = 0; i < 4*window_size; i++){
+		X_late[i] = creal(o_time[i])/((double) window_size*4.0); //fftw3 requires normalizing its output
+		//printf("%1.10f = %1.10f\n", (double) creal(i_time[i]), (double) X_late[i]);
 	}
 
 	// ---------------------------- 2nd window ------------------------------------------
 
 	// FFT of the 2nd window:
-	for(i = 0; i < window_size; i++){
-		i_time[i] = x_1[i];
+	for(i = 0; i < 4*window_size; i++){
+		i_time[i] = X_full[2*window_size+i]*hann[i];
 	}
 	fftw_execute(i_forward);
 	
 	// processing of the 2nd window in frequency domain:
-	for(i = 0; i < window_size; i++){
+	for(i = 0; i < 4*window_size; i++){
 		o_fft[i] = i_fft[i];
 	}
 	
 	// i-FFT of the 2nd window:
 	fftw_execute(o_inverse);
-	for(i = 0; i < window_size; i++){
-		x_1[i] = creal(o_time[i])/window_size; //fftw3 requires normalizing its output
-	}
-
-	// ---------------------------- 3rd window ------------------------------------------
-
-	// FFT of the 3rd window:
-	for(i = 0; i < window_size; i++){
-		i_time[i] = x_2[i];
-	}
-	fftw_execute(i_forward);
-	
-	// processing of the 3rd window in frequency domain:
-	for(i = 0; i < window_size; i++){
-		o_fft[i] = i_fft[i];
-	}
-	
-	// i-FFT of the 3rd window:
-	fftw_execute(o_inverse);
-	for(i = 0; i < window_size; i++){
-		x_2[i] = creal(o_time[i])/window_size; //fftw3 requires normalizing its output
+	for(i = 0; i < 4*window_size; i++){
+		X_early[i] = creal(o_time[i])/window_size/4.0; //fftw3 requires normalizing its output
 	}
 
 	// --------------------------------------------------------------------------------
 
 	// perform overlap-add:
-	for (int i = 0; i < overlap_size; ++i)
+	for (i = 0; i < window_size; ++i)
 	{
-		out1[i] 				= x_0[i+overlap_size] + x_1[i];
-		out1[i+overlap_size] 	= x_1[i+overlap_size] + x_2[i];
+		out1[i] = X_late[i+2*window_size+overlap_size] + X_early[i+overlap_size];
 
 		// turn stereo to mono:
-		out2[i] 				= out1[i];
-		out2[i+overlap_size] 	= out1[i+overlap_size];
+		out2[i] = out1[i];
 	}
 	
 	return 0;
@@ -192,16 +183,15 @@ int main (int argc, char *argv[]) {
 
 	// initialization of internal buffers
 	// - overlap-add buffers
-	aux = (jack_default_audio_sample_t *) calloc(window_size*2, sizeof(jack_default_audio_sample_t)); // calloc initializes with zeros
-	x_0 = (jack_default_audio_sample_t *) calloc(window_size, sizeof(jack_default_audio_sample_t)); // calloc initializes with zeros
-	x_1 = (jack_default_audio_sample_t *) calloc(window_size, sizeof(jack_default_audio_sample_t)); // calloc initializes with zeros
-	x_2 = (jack_default_audio_sample_t *) calloc(window_size, sizeof(jack_default_audio_sample_t)); // calloc initializes with zeros
+	X_late	= (jack_default_audio_sample_t *) calloc(window_size*4, sizeof(jack_default_audio_sample_t));
+	X_early	= (jack_default_audio_sample_t *) calloc(window_size*4, sizeof(jack_default_audio_sample_t));
+	X_full	= (jack_default_audio_sample_t *) calloc(window_size*6, sizeof(jack_default_audio_sample_t));
 
 	// - FFTW3 buffers
-	i_fft 	= (double complex *) fftw_malloc(sizeof(double complex) * window_size);
-	i_time 	= (double complex *) fftw_malloc(sizeof(double complex) * window_size);
-	o_fft 	= (double complex *) fftw_malloc(sizeof(double complex) * window_size);
-	o_time 	= (double complex *) fftw_malloc(sizeof(double complex) * window_size);
+	i_fft 	= (double complex *) fftw_malloc(sizeof(double complex) * 4*window_size);
+	i_time 	= (double complex *) fftw_malloc(sizeof(double complex) * 4*window_size);
+	o_fft 	= (double complex *) fftw_malloc(sizeof(double complex) * 4*window_size);
+	o_time 	= (double complex *) fftw_malloc(sizeof(double complex) * 4*window_size);
 
 	sample_rate = (double)jack_get_sample_rate(client);	
 	
@@ -209,9 +199,9 @@ int main (int argc, char *argv[]) {
 	o_inverse = fftw_plan_dft_1d(window_size, o_fft , o_time, FFTW_BACKWARD, FFTW_MEASURE);
 
 	// - hann window
-	hann = (double *) calloc(window_size, sizeof(double)); // calloc initializes with zeros
-	for(i = 0; i < window_size; ++i) {
-		hann[i] = 0.5 - 0.5*cos(2.0*M_PI* ((double) i/window_size));
+	hann = (jack_default_audio_sample_t *) calloc(4*window_size, sizeof(jack_default_audio_sample_t)); 
+	for(i = 0; i < 4*window_size; ++i) {
+		hann[i] = 0.5 - 0.5*cos(2.0*M_PI* ((double) i/(window_size*4.0-1)));
 	}
 	
 	/* display the current sample rate. */
