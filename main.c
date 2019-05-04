@@ -15,18 +15,32 @@
 #include <string.h>
 #include <math.h>
 
+// JACK: professional sound server daemon that provides real-time, 
+//       low-latency connections for both audio and MIDI data between applications that use its API.
 #include <jack/jack.h>
 
-// Include FFTW library
-#include <complex.h> 	//needs to be included before fftw3.h for compatibility
+// FFTW: library for computing the discrete Fourier transform of arbitrary input size, 
+//       and of both real and complex data.
+#include <complex.h> 	// needs to be included before fftw3.h for compatibility
 #include <fftw3.h>
 
-double complex *i_fft, *i_time, *o_fft, *o_time;
-fftw_plan i_forward, o_inverse;
+// Libsndfile: library designed to allow the reading and writing of many different sampled sound file formats
+//             through one standard library interface.
+#include <sndfile.h>
 
+// JACK:
 jack_port_t *input_port;
 jack_port_t **output_ports;
 jack_client_t *client;
+
+// FFTW:
+double complex *i_fft, *i_time, *o_fft, *o_time;
+fftw_plan i_forward, o_inverse;
+
+// Libsndfile:
+SNDFILE *audio_file;
+SF_INFO audio_info;
+unsigned int audio_position = 0;
 
 // default parameters:
 double sample_rate  = 48000.0;			// default sample rate
