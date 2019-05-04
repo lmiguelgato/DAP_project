@@ -29,7 +29,6 @@
 #include <sndfile.h>
 
 // JACK:
-jack_port_t *input_port;
 jack_port_t **output_ports;
 jack_client_t *client;
 
@@ -46,7 +45,8 @@ unsigned int audio_position = 0;
 double sample_rate  = 48000.0;			// default sample rate
 int nframes 		= 1024;				// default number of frames per jack buffer
 int window_size 	= 4096;				// default fft size (window_size must be four times nframes)
-int num_ports 		= 2;				// number of output ports
+
+unsigned int nchannels = 2;				// number of output ports
 
 jack_default_audio_sample_t *hann;		// array to store the Hann window
 
@@ -67,11 +67,18 @@ jack_default_audio_sample_t *X_full;
 int jack_callback (jack_nframes_t nframes, void *arg){
 
 	int i;
-	jack_default_audio_sample_t *in, *out1, *out2;
-	
-	in 		= (jack_default_audio_sample_t *)jack_port_get_buffer (input_port, 		nframes);
-	out1 	= (jack_default_audio_sample_t *)jack_port_get_buffer (output_ports[0], nframes);
-	out2 	= (jack_default_audio_sample_t *)jack_port_get_buffer (output_ports[1], nframes);
+	jack_default_audio_sample_t **out;
+	float *read_buffer;
+	int read_count;
+
+	out = (jack_default_audio_sample_t **)malloc(nchannels*sizeof(jack_default_audio_sample_t *));
+	for(i = 0; i < nchannels; ++i)
+		out[i] = (jack_default_audio_sample_t *)jack_port_get_buffer (output_ports[i], nframes);
+
+	read_buffer = (float *) malloc(nframes*sizeof(float));
+
+	// read from file:
+	read_count = sf_read_float(audio_file, read_buffer, nframes);
 
 	// shift windows to perform overlap-add:
 	for (i = 0; i < nframes; ++i)
@@ -81,7 +88,24 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		X_full[2*nframes + i] 	= X_full[3*nframes + i];
 		X_full[3*nframes + i] 	= X_full[4*nframes + i];
 		X_full[4*nframes + i] 	= X_full[5*nframes + i];
-		X_full[5*nframes + i] 	= in[i];
+
+		if (read_count != nframes && i >= read_count){
+			X_full[5*nframes + i] = 0.0;	// finished reading file, completing the buffer with silence.
+		}else{
+			X_full[5*nframes + i] = (jack_default_audio_sample_t) read_buffer[i];
+		}
+	}
+
+	//Print Audio position
+	audio_position += read_count;
+	printf("\rAudio file in position: %d (%0.2f secs)", audio_position, (double)audio_position/sample_rate);
+
+	//Check if this is the last frame of the audio file
+	if(read_count != nframes){
+		printf("\nFinished reading file.\n");
+		sf_close(audio_file);
+		jack_client_close (client);
+		exit (1);
 	}
 
 	// ---------------------------- 1st window ------------------------------------------
@@ -125,12 +149,11 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	// --------------------------------------------------------------------------------
 
 	// perform overlap-add:
-	for (i = 0; i < nframes; ++i)
-	{
-		out1[i] = X_late[i+2*nframes+nframes/2] + X_early[i+nframes/2];
-
-		// turn stereo to mono:
-		out2[i] = out1[i];
+	for (int j = 0; j < nchannels; ++j) {
+		for (i = 0; i < nframes; ++i)
+		{
+			out[j][i] = X_late[i+2*nframes+nframes/2] + X_early[i+nframes/2];
+		}
 	}
 	
 	return 0;
@@ -149,6 +172,28 @@ void jack_shutdown (void *arg){
 int main (int argc, char *argv[]) {
 
 	int i;
+
+	if(argc != 2){
+		printf ("Audio File Path not provided.\n");
+		exit(1);
+	}
+	
+	char audio_file_path[100];
+	strcpy(audio_file_path,argv[1]);
+	printf("Trying to open audio File: %s\n", audio_file_path);
+	
+	audio_file = sf_open (audio_file_path, SFM_READ, &audio_info);
+	if(audio_file == NULL){
+		printf("%s\n",sf_strerror(NULL));
+		exit(1);
+	}else{
+		printf("Audio file info:\n");
+		printf("\tSample Rate: %d\n",audio_info.samplerate);
+		printf("\tChannels: %d\n",audio_info.channels);
+		SF_FORMAT_INFO audio_format_info;
+		sf_command(NULL,SFC_GET_FORMAT_INFO,&audio_format_info, sizeof (SF_FORMAT_INFO));
+		printf("\tFormat: %s\n",audio_format_info.name);		
+	}
 
 	const char *client_name = "jack_fft";
 	jack_options_t options = JackNoStartServer;
@@ -210,25 +255,14 @@ int main (int argc, char *argv[]) {
 	printf ("Sample rate: %d\n", jack_get_sample_rate (client));
 	printf ("Window size: %d\n", jack_get_buffer_size (client));	
 	
-	/* create the agent input port */
-	input_port = jack_port_register (client, "input", JACK_DEFAULT_AUDIO_TYPE,JackPortIsInput, 0);
-	
-	char portname[10];
-	output_ports = (jack_port_t**) malloc(num_ports*sizeof(jack_port_t*));
-	for(i = 0; i<num_ports; ++i) {
-		sprintf(portname, "output_%d", i+1);
-		output_ports[i] = jack_port_register (client, portname, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
-	}
-	
-	/* check that both ports were created succesfully */
-	if (input_port == NULL) {
-		printf("Could not create input agent ports. Have we reached the maximum amount of JACK agent ports?\n");
-		exit (1);
-	}
-
-	for(i = 0; i<num_ports; ++i) {
+	/* create the agent output port */
+	output_ports = malloc(nchannels*sizeof(jack_port_t *));
+	char port_name[50];
+	for(i = 0; i < nchannels; ++i){
+		sprintf(port_name, "output_%d", i);
+		output_ports[i] = jack_port_register (client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
 		if (output_ports[i] == NULL) {
-			printf("Could not create output agent port number %d. Have we reached the maximum amount of JACK agent ports?\n", i);
+			printf("No more JACK ports available after creating port number %d\n",i);
 			exit (1);
 		}
 	}
@@ -254,9 +288,9 @@ int main (int argc, char *argv[]) {
 	/* Assign our input port to a server output port*/
 	// Find possible output server port names
 	const char **serverports_names;
-	serverports_names = jack_get_ports (client, NULL, NULL, JackPortIsPhysical|JackPortIsOutput);
+	serverports_names = jack_get_ports (client, NULL, NULL, JackPortIsPhysical|JackPortIsInput);
 	if (serverports_names == NULL) {
-		printf("No available physical capture (server output) ports.\n");
+		printf("no available physical playback (server input) ports.\n");
 		exit (1);
 	}
 	// Connect the first available to our input port
@@ -265,26 +299,7 @@ int main (int argc, char *argv[]) {
 		exit (1);
 	}
 	// free serverports_names variable for reuse in next part of the code
-	free (serverports_names);
-	
-	
-	/* Assign our output port to a server input port*/
-	// Find possible input server port names
-	serverports_names = jack_get_ports (client, NULL, NULL, JackPortIsPhysical|JackPortIsInput);
-	if (serverports_names == NULL) {
-		printf("No available physical playback (server input) ports.\n");
-		exit (1);
-	}
-	for(i = 0; i<num_ports; ++i) {
-		// Connect the first available to our output port
-		if (jack_connect (client, jack_port_name (output_ports[i]), serverports_names[i])) {
-			printf ("Cannot connect output ports %d.\n", i);
-			exit (1);
-		}
-	}
-	// free serverports_names variable, we're not going to use it again
-	free (serverports_names);
-	
+	free (serverports_names);	
 	
 	printf ("done.\n");
 	/* keep running until stopped by the user */
