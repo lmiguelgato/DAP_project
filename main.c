@@ -104,7 +104,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	if(read_count != nframes){
 		printf("\nFinished reading file.\n");
 		sf_close(audio_file);
-		jack_client_close (client);
+		//jack_client_close (client);		// not passing
 		exit (1);
 	}
 
@@ -255,17 +255,16 @@ int main (int argc, char *argv[]) {
 	printf ("Sample rate: %d\n", jack_get_sample_rate (client));
 	printf ("Window size: %d\n", jack_get_buffer_size (client));	
 	
-	/* create the agent output port */
-	output_ports = malloc(nchannels*sizeof(jack_port_t *));
-	char port_name[50];
-	for(i = 0; i < nchannels; ++i){
-		sprintf(port_name, "output_%d", i);
-		output_ports[i] = jack_port_register (client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+	char portname[10];
+	output_ports = (jack_port_t**) malloc(nchannels*sizeof(jack_port_t*));
+	for(i = 0; i < nchannels; ++i) {
+		sprintf(portname, "output_%d", i+1);
+		output_ports[i] = jack_port_register (client, portname, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
 		if (output_ports[i] == NULL) {
 			printf("No more JACK ports available after creating port number %d\n",i);
 			exit (1);
 		}
-	}
+	}	
 	
 	/* Tell the JACK server that we are ready to roll.
 	   Our jack_callback() callback will start running now. */
@@ -284,22 +283,26 @@ int main (int argc, char *argv[]) {
 	 * it.
 	 */
 	printf ("Connecting ports... ");
-	 
-	/* Assign our input port to a server output port*/
-	// Find possible output server port names
+
 	const char **serverports_names;
+	
+	/* Assign our output port to a server input port*/
+	// Find possible input server port names
 	serverports_names = jack_get_ports (client, NULL, NULL, JackPortIsPhysical|JackPortIsInput);
 	if (serverports_names == NULL) {
-		printf("no available physical playback (server input) ports.\n");
+		printf("No available physical playback (server input) ports.\n");
 		exit (1);
 	}
-	// Connect the first available to our input port
-	if (jack_connect (client, serverports_names[0], jack_port_name (input_port))) {
-		printf("Cannot connect input port.\n");
-		exit (1);
+	for(i = 0; i<nchannels; ++i) {
+		// Connect the first available to our output port
+		if (jack_connect (client, jack_port_name (output_ports[i]), serverports_names[i])) {
+			printf ("Cannot connect output ports %d.\n", i);
+			exit (1);
+		}
 	}
-	// free serverports_names variable for reuse in next part of the code
-	free (serverports_names);	
+	// free serverports_names variable, we're not going to use it again
+	free (serverports_names);
+	
 	
 	printf ("done.\n");
 	/* keep running until stopped by the user */
