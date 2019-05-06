@@ -35,6 +35,7 @@
 #include <Eigen/Eigen>
 
 // JACK:
+jack_port_t **input_ports;
 jack_port_t **output_ports;
 jack_client_t *client;
 
@@ -58,14 +59,15 @@ double sample_rate  = 48000.0;			// default sample rate
 int nframes 		= 1024;				// default number of frames per jack buffer
 int window_size 	= 4096;				// default fft size (window_size must be four times nframes)
 
-unsigned int nchannels = 2;				// number of output ports
+unsigned int n_out_channels = 2;		// number of output channels
+unsigned int n_in_channels = 3;			// number of input channels
 
 jack_default_audio_sample_t *hann;		// array to store the Hann window
 
 // overlap-add registers:
-jack_default_audio_sample_t *X_late;
-jack_default_audio_sample_t *X_early;
-jack_default_audio_sample_t *X_full;
+jack_default_audio_sample_t **X_late;
+jack_default_audio_sample_t **X_early;
+jack_default_audio_sample_t **X_full;
 
 
 /**
@@ -78,52 +80,29 @@ jack_default_audio_sample_t *X_full;
  */
 int jack_callback (jack_nframes_t nframes, void *arg){
 
-	int i, error;
-	jack_default_audio_sample_t **out;
-	float *read_buffer;
-	int read_count;
+	int i, j;
 
-	out = (jack_default_audio_sample_t **)malloc(nchannels*sizeof(jack_default_audio_sample_t *));
-	for(i = 0; i < nchannels; ++i)
+	jack_default_audio_sample_t **in;
+	jack_default_audio_sample_t **out;
+
+	in = (jack_default_audio_sample_t **)malloc(n_in_channels*sizeof(jack_default_audio_sample_t *));
+	for(i = 0; i < n_in_channels; ++i)
+		in[i] = (jack_default_audio_sample_t *)jack_port_get_buffer (input_ports[i], nframes);
+
+	out = (jack_default_audio_sample_t **)malloc(n_out_channels*sizeof(jack_default_audio_sample_t *));
+	for(i = 0; i < n_out_channels; ++i)
 		out[i] = (jack_default_audio_sample_t *)jack_port_get_buffer (output_ports[i], nframes);
 
-	/* If the input buffer is empty, refill it. */
-	if (samplerate_data.input_frames == 0){
-		samplerate_data.input_frames = sf_readf_float (audio_file, samplerate_buff_in, nframes);
-		samplerate_data.data_in = samplerate_buff_in; //necessary to avoid overlapping buffers
-		
-		/* The last read will not be a full buffer, so snd_of_input. */
-		if (samplerate_data.input_frames < nframes)
-			samplerate_data.end_of_input = SF_TRUE;
-	}
-	
-	if ((error = src_process (samplerate_conv, &samplerate_data))){
-		printf ("\nError : %s\n", src_strerror (error)) ;
-		exit (1) ;
-	}
-	
-	/* Terminate if done. */
-	if (samplerate_data.end_of_input && samplerate_data.output_frames_gen == 0){
-		printf("\nFinished reading file.\n");
-		sf_close(audio_file);
-		src_delete(samplerate_conv);
-		//jack_client_close (client);	// not passing this line
-		exit (1);
-	}
-
 	// shift windows to perform overlap-add:
-	for (i = 0; i < nframes; ++i)
-	{
-		X_full[i] 				= X_full[nframes + i];
-		X_full[nframes + i] 	= X_full[2*nframes + i];
-		X_full[2*nframes + i] 	= X_full[3*nframes + i];
-		X_full[3*nframes + i] 	= X_full[4*nframes + i];
-		X_full[4*nframes + i] 	= X_full[5*nframes + i];
-
-		if (samplerate_data.input_frames != nframes && i >= samplerate_data.input_frames){
-			X_full[5*nframes + i] = 0.0;	// finished reading file, completing the buffer with silence.
-		}else{
-			X_full[5*nframes + i] = (jack_default_audio_sample_t)samplerate_data.data_out[i];
+	for (j = 0; j < n_in_channels; ++j) {
+		for (i = 0; i < nframes; ++i)
+		{
+			X_full[j][i] 				= X_full[j][nframes + i];
+			X_full[j][nframes + i] 		= X_full[j][2*nframes + i];
+			X_full[j][2*nframes + i] 	= X_full[j][3*nframes + i];
+			X_full[j][3*nframes + i] 	= X_full[j][4*nframes + i];
+			X_full[j][4*nframes + i] 	= X_full[j][5*nframes + i];
+			X_full[j][5*nframes + i] 	= in[j][i];
 		}
 	}
 
@@ -175,7 +154,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	// --------------------------------------------------------------------------------
 
 	// perform overlap-add:
-	for (int j = 0; j < nchannels; ++j) {
+	for (int j = 0; j < n_out_channels; ++j) {
 		for (i = 0; i < nframes; ++i)
 		{
 			out[j][i] = X_late[i+2*nframes+nframes/2] + X_early[i+nframes/2];
@@ -257,9 +236,15 @@ int main (int argc, char *argv[]) {
 
 	// initialization of internal buffers
 	// - overlap-add buffers
-	X_late	= (jack_default_audio_sample_t *) calloc(window_size, sizeof(jack_default_audio_sample_t));
-	X_early	= (jack_default_audio_sample_t *) calloc(window_size, sizeof(jack_default_audio_sample_t));
-	X_full	= (jack_default_audio_sample_t *) calloc(window_size + window_size/2, sizeof(jack_default_audio_sample_t));
+	X_late	= (jack_default_audio_sample_t **) calloc(n_in_channels, sizeof(jack_default_audio_sample_t*));
+	X_early	= (jack_default_audio_sample_t **) calloc(n_in_channels, sizeof(jack_default_audio_sample_t*));
+	X_full	= (jack_default_audio_sample_t **) calloc(n_in_channels, sizeof(jack_default_audio_sample_t*));
+
+    for (i = 0; i < n_in_channels; ++i) {
+        X_late[i]	= (jack_default_audio_sample_t *) calloc(window_size, sizeof(jack_default_audio_sample_t));
+		X_early[i]	= (jack_default_audio_sample_t *) calloc(window_size, sizeof(jack_default_audio_sample_t));
+		X_full[i]	= (jack_default_audio_sample_t *) calloc(window_size + window_size/2, sizeof(jack_default_audio_sample_t));
+    }	
 
 	// - FFTW3 buffers
 	i_fft = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
@@ -311,8 +296,8 @@ int main (int argc, char *argv[]) {
 	samplerate_data.end_of_input = 0;
 	
 	char portname[10];
-	output_ports = (jack_port_t**) malloc(nchannels*sizeof(jack_port_t*));
-	for(i = 0; i < nchannels; ++i) {
+	output_ports = (jack_port_t**) malloc(n_out_channels*sizeof(jack_port_t*));
+	for(i = 0; i < n_out_channels; ++i) {
 		sprintf(portname, "output_%d", i+1);
 		output_ports[i] = jack_port_register (client, portname, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
 		if (output_ports[i] == NULL) {
@@ -348,7 +333,7 @@ int main (int argc, char *argv[]) {
 		printf("No available physical playback (server input) ports.\n");
 		exit (1);
 	}
-	for(i = 0; i<nchannels; ++i) {
+	for(i = 0; i<n_out_channels; ++i) {
 		// Connect the first available to our output port
 		if (jack_connect (client, jack_port_name (output_ports[i]), serverports_names[i])) {
 			printf ("Cannot connect output ports %d.\n", i);
