@@ -28,6 +28,9 @@
 //             through one standard library interface.
 #include <sndfile.h>
 
+// libsamplerate (aka Secret Rabbit Code): library for performing sample rate conversion of audio data.
+#include <samplerate.h>
+
 // JACK:
 jack_port_t **output_ports;
 jack_client_t *client;
