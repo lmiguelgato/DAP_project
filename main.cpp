@@ -1,4 +1,4 @@
-/**
+	/**
  * Final Project of Digital Audio Processing
  *
  * Objectives:
@@ -24,17 +24,11 @@
 #include <complex.h> 	// needs to be included before fftw3.h for compatibility
 #include <fftw3.h>
 
-// Libsndfile: library designed to allow the reading and writing of many different sampled sound file formats
-//             through one standard library interface.
-#include <sndfile.h>
-
-// libsamplerate (aka Secret Rabbit Code): library for performing sample rate conversion of audio data.
-#include <samplerate.h>
-
 // Eigen: C++ template library for linear algebra: matrices, vectors, numerical solvers, and related algorithms.
 #include <Eigen/Eigen>
 
 // JACK:
+jack_port_t **input_ports;
 jack_port_t **output_ports;
 jack_client_t *client;
 
@@ -42,30 +36,20 @@ jack_client_t *client;
 std::complex<double> *i_fft, *i_time, *o_fft, *o_time;
 fftw_plan i_forward, o_inverse;
 
-// Libsndfile:
-SNDFILE *audio_file;
-SF_INFO audio_info;
-unsigned int audio_position = 0;
-
-// libsamplerate:
-#define DEFAULT_CONVERTER SRC_SINC_MEDIUM_QUALITY
-float * samplerate_buff_in;
-SRC_STATE * samplerate_conv;
-SRC_DATA samplerate_data;
-
 // default parameters:
 double sample_rate  = 48000.0;			// default sample rate
 int nframes 		= 1024;				// default number of frames per jack buffer
 int window_size 	= 4096;				// default fft size (window_size must be four times nframes)
 
-unsigned int nchannels = 2;				// number of output ports
+unsigned int n_out_channels = 2;		// number of output channels
+unsigned int n_in_channels = 3;			// number of input channels
 
 jack_default_audio_sample_t *hann;		// array to store the Hann window
 
 // overlap-add registers:
-jack_default_audio_sample_t *X_late;
-jack_default_audio_sample_t *X_early;
-jack_default_audio_sample_t *X_full;
+jack_default_audio_sample_t **X_late;
+jack_default_audio_sample_t **X_early;
+jack_default_audio_sample_t **X_full;
 
 
 /**
@@ -78,107 +62,78 @@ jack_default_audio_sample_t *X_full;
  */
 int jack_callback (jack_nframes_t nframes, void *arg){
 
-	int i, error;
-	jack_default_audio_sample_t **out;
-	float *read_buffer;
-	int read_count;
+	int i, j, k;
 
-	out = (jack_default_audio_sample_t **)malloc(nchannels*sizeof(jack_default_audio_sample_t *));
-	for(i = 0; i < nchannels; ++i)
+	jack_default_audio_sample_t **in;
+	jack_default_audio_sample_t **out;
+
+	in = (jack_default_audio_sample_t **)malloc(n_in_channels*sizeof(jack_default_audio_sample_t *));
+	for(i = 0; i < n_in_channels; ++i)
+		in[i] = (jack_default_audio_sample_t *)jack_port_get_buffer (input_ports[i], nframes);
+
+	out = (jack_default_audio_sample_t **)malloc(n_out_channels*sizeof(jack_default_audio_sample_t *));
+	for(i = 0; i < n_out_channels; ++i)
 		out[i] = (jack_default_audio_sample_t *)jack_port_get_buffer (output_ports[i], nframes);
 
-	/* If the input buffer is empty, refill it. */
-	if (samplerate_data.input_frames == 0){
-		samplerate_data.input_frames = sf_readf_float (audio_file, samplerate_buff_in, nframes);
-		samplerate_data.data_in = samplerate_buff_in; //necessary to avoid overlapping buffers
-		
-		/* The last read will not be a full buffer, so snd_of_input. */
-		if (samplerate_data.input_frames < nframes)
-			samplerate_data.end_of_input = SF_TRUE;
-	}
-	
-	if ((error = src_process (samplerate_conv, &samplerate_data))){
-		printf ("\nError : %s\n", src_strerror (error)) ;
-		exit (1) ;
-	}
-	
-	/* Terminate if done. */
-	if (samplerate_data.end_of_input && samplerate_data.output_frames_gen == 0){
-		printf("\nFinished reading file.\n");
-		sf_close(audio_file);
-		src_delete(samplerate_conv);
-		//jack_client_close (client);	// not passing this line
-		exit (1);
-	}
-
 	// shift windows to perform overlap-add:
-	for (i = 0; i < nframes; ++i)
-	{
-		X_full[i] 				= X_full[nframes + i];
-		X_full[nframes + i] 	= X_full[2*nframes + i];
-		X_full[2*nframes + i] 	= X_full[3*nframes + i];
-		X_full[3*nframes + i] 	= X_full[4*nframes + i];
-		X_full[4*nframes + i] 	= X_full[5*nframes + i];
+	for (j = 0; j < n_in_channels; ++j) {
+		for (i = 0; i < nframes; ++i)
+		{
+			X_full[j][i] 				= X_full[j][nframes + i];
+			X_full[j][nframes + i] 		= X_full[j][2*nframes + i];
+			X_full[j][2*nframes + i] 	= X_full[j][3*nframes + i];
+			X_full[j][3*nframes + i] 	= X_full[j][4*nframes + i];
+			X_full[j][4*nframes + i] 	= X_full[j][5*nframes + i];
+			X_full[j][5*nframes + i] 	= in[j][i];
+		}
 
-		if (samplerate_data.input_frames != nframes && i >= samplerate_data.input_frames){
-			X_full[5*nframes + i] = 0.0;	// finished reading file, completing the buffer with silence.
-		}else{
-			X_full[5*nframes + i] = (jack_default_audio_sample_t)samplerate_data.data_out[i];
+		// ---------------------------- 1st window ------------------------------------------
+
+		// FFT of the 1st window:
+		for(i = 0; i < window_size; ++i){
+			i_time[i] = X_full[j][i]*hann[i];
+		}
+		fftw_execute(i_forward);
+		
+		// processing of the 1st window in frequency domain:
+		for(i = 0; i < window_size; ++i){
+			o_fft[i] = i_fft[i];
+		}
+		
+		// i-FFT of the 1st window:
+		fftw_execute(o_inverse);
+		for(i = 0; i < window_size; ++i){
+			X_late[j][i] = real(o_time[i])/window_size; //fftw3 requires normalizing its output
+		}
+
+		// ---------------------------- 2nd window ------------------------------------------
+
+		// FFT of the 2nd window:
+		for(i = 0; i < window_size; ++i){
+			i_time[i] = X_full[j][2*nframes+i]*hann[i];
+		}
+		fftw_execute(i_forward);
+		
+		// processing of the 2nd window in frequency domain:
+		for(i = 0; i < window_size; ++i){
+			o_fft[i] = i_fft[i];
+		}
+		
+		// i-FFT of the 2nd window:
+		fftw_execute(o_inverse);
+		for(i = 0; i < window_size; ++i){
+			X_early[j][i] = real(o_time[i])/window_size; //fftw3 requires normalizing its output
 		}
 	}
 
-	samplerate_data.data_in += samplerate_data.input_frames_used;
-	samplerate_data.input_frames -= samplerate_data.input_frames_used;
-
-	//Print Audio position
-	audio_position += samplerate_data.output_frames_gen;
-	printf("\rAudio file in position: %d (%0.2f secs)", audio_position, (double)audio_position/sample_rate);
-
-	// ---------------------------- 1st window ------------------------------------------
-
-	// FFT of the 1st window:
-	for(i = 0; i < window_size; ++i){
-		i_time[i] = X_full[i]*hann[i];
-	}
-	fftw_execute(i_forward);
-	
-	// processing of the 1st window in frequency domain:
-	for(i = 0; i < window_size; ++i){
-		o_fft[i] = i_fft[i];
-	}
-	
-	// i-FFT of the 1st window:
-	fftw_execute(o_inverse);
-	for(i = 0; i < window_size; ++i){
-		X_late[i] = real(o_time[i])/window_size; //fftw3 requires normalizing its output
-	}
-
-	// ---------------------------- 2nd window ------------------------------------------
-
-	// FFT of the 2nd window:
-	for(i = 0; i < window_size; ++i){
-		i_time[i] = X_full[2*nframes+i]*hann[i];
-	}
-	fftw_execute(i_forward);
-	
-	// processing of the 2nd window in frequency domain:
-	for(i = 0; i < window_size; ++i){
-		o_fft[i] = i_fft[i];
-	}
-	
-	// i-FFT of the 2nd window:
-	fftw_execute(o_inverse);
-	for(i = 0; i < window_size; ++i){
-		X_early[i] = real(o_time[i])/window_size; //fftw3 requires normalizing its output
-	}
-
-	// --------------------------------------------------------------------------------
-
 	// perform overlap-add:
-	for (int j = 0; j < nchannels; ++j) {
-		for (i = 0; i < nframes; ++i)
-		{
-			out[j][i] = X_late[i+2*nframes+nframes/2] + X_early[i+nframes/2];
+	for (k = 0; j < n_out_channels; ++j) {
+		for (i = 0; i < nframes; ++i) {
+			out[k][i] = 0;			
+			for (j = 0; j < n_in_channels; ++j)
+			{
+				out[k][i] += X_late[j][i+2*nframes+nframes/2] + X_early[j][i+nframes/2];
+			}
 		}
 	}
 	
@@ -198,29 +153,6 @@ void jack_shutdown (void *arg){
 int main (int argc, char *argv[]) {
 
 	int i;
-
-	if(argc != 2){
-		printf ("Audio File Path not provided.\n");
-		exit(1);
-	}
-	
-	char audio_file_path[100];
-	strcpy(audio_file_path,argv[1]);
-	printf("\nTrying to open audio File: %s\n", audio_file_path);
-	
-	// read audio file:
-	audio_file = sf_open (audio_file_path, SFM_READ, &audio_info);
-	if(audio_file == NULL){
-		printf("%s\n",sf_strerror(NULL));
-		exit(1);
-	}else{
-		printf("\nAudio file info:\n");
-		printf("\tSample Rate: %d\n",audio_info.samplerate);
-		printf("\tNumber of channels: %d\n",audio_info.channels);
-		SF_FORMAT_INFO audio_format_info;
-		sf_command(NULL,SFC_GET_FORMAT_INFO,&audio_format_info, sizeof (SF_FORMAT_INFO));
-		printf("\tFormat: %d - %s\n\n",audio_info.format, audio_format_info.name);		
-	}
 
 	const char *client_name = "jack_doa_beamformer";
 	jack_options_t options = JackNoStartServer;
@@ -246,7 +178,6 @@ int main (int argc, char *argv[]) {
 	/* tell the JACK server to call 'jack_callback()' whenever there is work to be done. */
 	jack_set_process_callback (client, jack_callback, 0);
 	
-	
 	/* tell the JACK server to call 'jack_shutdown()' if it ever shuts down,
 	   either entirely, or if it just decides to stop calling us. */
 	jack_on_shutdown (client, jack_shutdown, 0);
@@ -257,9 +188,15 @@ int main (int argc, char *argv[]) {
 
 	// initialization of internal buffers
 	// - overlap-add buffers
-	X_late	= (jack_default_audio_sample_t *) calloc(window_size, sizeof(jack_default_audio_sample_t));
-	X_early	= (jack_default_audio_sample_t *) calloc(window_size, sizeof(jack_default_audio_sample_t));
-	X_full	= (jack_default_audio_sample_t *) calloc(window_size + window_size/2, sizeof(jack_default_audio_sample_t));
+	X_late	= (jack_default_audio_sample_t **) calloc(n_in_channels, sizeof(jack_default_audio_sample_t*));
+	X_early	= (jack_default_audio_sample_t **) calloc(n_in_channels, sizeof(jack_default_audio_sample_t*));
+	X_full	= (jack_default_audio_sample_t **) calloc(n_in_channels, sizeof(jack_default_audio_sample_t*));
+
+    for (i = 0; i < n_in_channels; ++i) {
+        X_late[i]	= (jack_default_audio_sample_t *) calloc(window_size, sizeof(jack_default_audio_sample_t));
+		X_early[i]	= (jack_default_audio_sample_t *) calloc(window_size, sizeof(jack_default_audio_sample_t));
+		X_full[i]	= (jack_default_audio_sample_t *) calloc(window_size + window_size/2, sizeof(jack_default_audio_sample_t));
+    }	
 
 	// - FFTW3 buffers
 	i_fft = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
@@ -280,43 +217,26 @@ int main (int argc, char *argv[]) {
 	
 	/* display the current sample rate. */
 	printf ("JACK client info:\n");
-	printf ("\tEngine sample rate: %d", jack_get_sample_rate (client));
-	if (audio_info.samplerate != jack_get_sample_rate (client)) {
-		printf ("\tWarning: sampling rate mismatch.");
-	}
-	printf ("\n");
-	printf ("\tWindow size: %d\n\n", jack_get_buffer_size (client));	
-
-	// creating sample rate converter:
-	printf("Creating the sample rate converter...\n");
-	int samplerate_error;
-	samplerate_conv = src_new (DEFAULT_CONVERTER,1,&samplerate_error);
-	if(samplerate_conv == NULL){
-		printf("%s\n",src_strerror (samplerate_error));
-		exit(1);
-	}
+	printf ("\tEngine sample rate: %d\n", jack_get_sample_rate (client));
+	printf ("\tWindow size: %d\n\n", jack_get_buffer_size (client));
 	
-	samplerate_data.src_ratio = (double)(((double)sample_rate)/((double)audio_info.samplerate));
-	printf("Using samplerate ratio: %f\n", samplerate_data.src_ratio);
-	if (src_is_valid_ratio (samplerate_data.src_ratio) == 0){
-		printf ("Error : Sample rate change out of valid range.\n") ;
-		sf_close (audio_file) ;
-		exit (1) ;
-	}
-	samplerate_buff_in = (float *)malloc(jack_get_buffer_size(client)*sizeof(float)); //necessary to avoid overlapping buffers
-	samplerate_data.data_in = samplerate_buff_in;
-	samplerate_data.data_out = (float *)malloc(jack_get_buffer_size(client)*sizeof(float));
-	samplerate_data.input_frames = 0;
-	samplerate_data.output_frames = jack_get_buffer_size(client);
-	samplerate_data.end_of_input = 0;
-	
-	char portname[10];
-	output_ports = (jack_port_t**) malloc(nchannels*sizeof(jack_port_t*));
-	for(i = 0; i < nchannels; ++i) {
-		sprintf(portname, "output_%d", i+1);
+	char portname[13];
+	output_ports = (jack_port_t**) malloc(n_out_channels*sizeof(jack_port_t*));
+	for(i = 0; i < n_out_channels; ++i) {
+		sprintf(portname, "speaker_%d", i+1);
 		output_ports[i] = jack_port_register (client, portname, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
 		if (output_ports[i] == NULL) {
-			printf("No more JACK ports available after creating port number %d\n",i);
+			printf("No more JACK ports available after creating output port number %d\n",i);
+			exit (1);
+		}
+	}	
+
+	input_ports = (jack_port_t**) malloc(n_in_channels*sizeof(jack_port_t*));
+	for(i = 0; i < n_in_channels; ++i) {
+		sprintf(portname, "microphone_%d", i+1);
+		input_ports[i] = jack_port_register (client, portname, JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
+		if (input_ports[i] == NULL) {
+			printf("No more JACK ports available after creating input port number %d\n",i);
 			exit (1);
 		}
 	}	
@@ -348,16 +268,31 @@ int main (int argc, char *argv[]) {
 		printf("No available physical playback (server input) ports.\n");
 		exit (1);
 	}
-	for(i = 0; i<nchannels; ++i) {
+	for(i = 0; i<n_out_channels; ++i) {
 		// Connect the first available to our output port
 		if (jack_connect (client, jack_port_name (output_ports[i]), serverports_names[i])) {
-			printf ("Cannot connect output ports %d.\n", i);
+			printf ("Cannot connect input port number %d.\n", i);
 			exit (1);
 		}
 	}
 	// free serverports_names variable, we're not going to use it again
 	free (serverports_names);
-	
+
+	/*serverports_names = jack_get_ports (client, NULL, NULL, JackPortIsPhysical|JackPortIsOutput);
+	if (serverports_names == NULL) {
+		printf("No available physical capture (server output) ports.\n");
+		exit (1);
+	}
+	// Connect the first available to our input port
+	for(i = 0; i<n_in_channels; ++i) {
+		// Connect the first available to our output port
+		if (jack_connect (client, serverports_names[i], jack_port_name (input_ports[i]))) {
+			printf ("Cannot connect output port number %d.\n", i);
+			exit (1);
+		}
+	}
+	// free serverports_names variable for reuse in next part of the code
+	free (serverports_names);	*/
 	
 	printf ("done.\n\n");
 	/* keep running until stopped by the user */
