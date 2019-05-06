@@ -32,7 +32,7 @@
 #include <samplerate.h>
 
 // Eigen: C++ template library for linear algebra: matrices, vectors, numerical solvers, and related algorithms.
-//#include <Eigen/Eigen>
+#include <Eigen/Eigen>
 
 // JACK:
 jack_port_t **output_ports;
