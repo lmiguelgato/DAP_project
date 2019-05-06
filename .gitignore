@@ -29,4 +29,8 @@
 
 pda_project
 
+corpus/
+
 *.wav
+
+ReadMicWavs
