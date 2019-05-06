@@ -180,19 +180,20 @@ int main (int argc, char *argv[]) {
 	
 	char audio_file_path[100];
 	strcpy(audio_file_path,argv[1]);
-	printf("Trying to open audio File: %s\n", audio_file_path);
+	printf("\nTrying to open audio File: %s\n", audio_file_path);
 	
+	// read audio file:
 	audio_file = sf_open (audio_file_path, SFM_READ, &audio_info);
 	if(audio_file == NULL){
 		printf("%s\n",sf_strerror(NULL));
 		exit(1);
 	}else{
-		printf("Audio file info:\n");
+		printf("\nAudio file info:\n");
 		printf("\tSample Rate: %d\n",audio_info.samplerate);
-		printf("\tChannels: %d\n",audio_info.channels);
+		printf("\tNumber of channels: %d\n",audio_info.channels);
 		SF_FORMAT_INFO audio_format_info;
 		sf_command(NULL,SFC_GET_FORMAT_INFO,&audio_format_info, sizeof (SF_FORMAT_INFO));
-		printf("\tFormat: %s\n",audio_format_info.name);		
+		printf("\tFormat: %d - %s\n\n",audio_info.format, audio_format_info.name);		
 	}
 
 	const char *client_name = "jack_fft";
@@ -252,8 +253,13 @@ int main (int argc, char *argv[]) {
 	}
 	
 	/* display the current sample rate. */
-	printf ("Sample rate: %d\n", jack_get_sample_rate (client));
-	printf ("Window size: %d\n", jack_get_buffer_size (client));	
+	printf ("JACK client info:\n");
+	printf ("\tEngine sample rate: %d", jack_get_sample_rate (client));
+	if (audio_info.samplerate != jack_get_sample_rate (client)) {
+		printf ("\tWarning: sampling rate mismatch.");
+	}
+	printf ("\n");
+	printf ("\tWindow size: %d\n\n", jack_get_buffer_size (client));	
 	
 	char portname[10];
 	output_ports = (jack_port_t**) malloc(nchannels*sizeof(jack_port_t*));
@@ -304,7 +310,7 @@ int main (int argc, char *argv[]) {
 	free (serverports_names);
 	
 	
-	printf ("done.\n");
+	printf ("done.\n\n");
 	/* keep running until stopped by the user */
 	sleep (-1);
 	
