@@ -44,6 +44,12 @@ SNDFILE *audio_file;
 SF_INFO audio_info;
 unsigned int audio_position = 0;
 
+// libsamplerate:
+#define DEFAULT_CONVERTER SRC_SINC_MEDIUM_QUALITY
+float * samplerate_buff_in;
+SRC_STATE * samplerate_conv;
+SRC_DATA samplerate_data;
+
 // default parameters:
 double sample_rate  = 48000.0;			// default sample rate
 int nframes 		= 1024;				// default number of frames per jack buffer
@@ -69,7 +75,7 @@ jack_default_audio_sample_t *X_full;
  */
 int jack_callback (jack_nframes_t nframes, void *arg){
 
-	int i;
+	int i, error;
 	jack_default_audio_sample_t **out;
 	float *read_buffer;
 	int read_count;
@@ -78,10 +84,29 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	for(i = 0; i < nchannels; ++i)
 		out[i] = (jack_default_audio_sample_t *)jack_port_get_buffer (output_ports[i], nframes);
 
-	read_buffer = (float *) malloc(nframes*sizeof(float));
-
-	// read from file:
-	read_count = sf_read_float(audio_file, read_buffer, nframes);
+	/* If the input buffer is empty, refill it. */
+	if (samplerate_data.input_frames == 0){
+		samplerate_data.input_frames = sf_readf_float (audio_file, samplerate_buff_in, nframes);
+		samplerate_data.data_in = samplerate_buff_in; //necessary to avoid overlapping buffers
+		
+		/* The last read will not be a full buffer, so snd_of_input. */
+		if (samplerate_data.input_frames < nframes)
+			samplerate_data.end_of_input = SF_TRUE;
+	}
+	
+	if ((error = src_process (samplerate_conv, &samplerate_data))){
+		printf ("\nError : %s\n", src_strerror (error)) ;
+		exit (1) ;
+	}
+	
+	/* Terminate if done. */
+	if (samplerate_data.end_of_input && samplerate_data.output_frames_gen == 0){
+		printf("\nFinished reading file.\n");
+		sf_close(audio_file);
+		src_delete(samplerate_conv);
+		//jack_client_close (client);	// not passing this line
+		exit (1);
+	}
 
 	// shift windows to perform overlap-add:
 	for (i = 0; i < nframes; ++i)
@@ -92,24 +117,19 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		X_full[3*nframes + i] 	= X_full[4*nframes + i];
 		X_full[4*nframes + i] 	= X_full[5*nframes + i];
 
-		if (read_count != nframes && i >= read_count){
+		if (samplerate_data.input_frames != nframes && i >= samplerate_data.input_frames){
 			X_full[5*nframes + i] = 0.0;	// finished reading file, completing the buffer with silence.
 		}else{
-			X_full[5*nframes + i] = (jack_default_audio_sample_t) read_buffer[i];
+			X_full[5*nframes + i] = (jack_default_audio_sample_t)samplerate_data.data_out[i];
 		}
 	}
 
-	//Print Audio position
-	audio_position += read_count;
-	printf("\rAudio file in position: %d (%0.2f secs)", audio_position, (double)audio_position/sample_rate);
+	samplerate_data.data_in += samplerate_data.input_frames_used;
+	samplerate_data.input_frames -= samplerate_data.input_frames_used;
 
-	//Check if this is the last frame of the audio file
-	if(read_count != nframes){
-		printf("\nFinished reading file.\n");
-		sf_close(audio_file);
-		//jack_client_close (client);		// not passing
-		exit (1);
-	}
+	//Print Audio position
+	audio_position += samplerate_data.output_frames_gen;
+	printf("\rAudio file in position: %d (%0.2f secs)", audio_position, (double)audio_position/sample_rate);
 
 	// ---------------------------- 1st window ------------------------------------------
 
@@ -199,7 +219,7 @@ int main (int argc, char *argv[]) {
 		printf("\tFormat: %d - %s\n\n",audio_info.format, audio_format_info.name);		
 	}
 
-	const char *client_name = "jack_fft";
+	const char *client_name = "jack_doa_beamformer";
 	jack_options_t options = JackNoStartServer;
 	jack_status_t status;
 	
@@ -263,6 +283,29 @@ int main (int argc, char *argv[]) {
 	}
 	printf ("\n");
 	printf ("\tWindow size: %d\n\n", jack_get_buffer_size (client));	
+
+	// creating sample rate converter:
+	printf("Creating the sample rate converter...\n");
+	int samplerate_error;
+	samplerate_conv = src_new (DEFAULT_CONVERTER,1,&samplerate_error);
+	if(samplerate_conv == NULL){
+		printf("%s\n",src_strerror (samplerate_error));
+		exit(1);
+	}
+	
+	samplerate_data.src_ratio = (double)(((double)sample_rate)/((double)audio_info.samplerate));
+	printf("Using samplerate ratio: %f\n", samplerate_data.src_ratio);
+	if (src_is_valid_ratio (samplerate_data.src_ratio) == 0){
+		printf ("Error : Sample rate change out of valid range.\n") ;
+		sf_close (audio_file) ;
+		exit (1) ;
+	}
+	samplerate_buff_in = (float *)malloc(jack_get_buffer_size(client)*sizeof(float)); //necessary to avoid overlapping buffers
+	samplerate_data.data_in = samplerate_buff_in;
+	samplerate_data.data_out = (float *)malloc(jack_get_buffer_size(client)*sizeof(float));
+	samplerate_data.input_frames = 0;
+	samplerate_data.output_frames = jack_get_buffer_size(client);
+	samplerate_data.end_of_input = 0;
 	
 	char portname[10];
 	output_ports = (jack_port_t**) malloc(nchannels*sizeof(jack_port_t*));
