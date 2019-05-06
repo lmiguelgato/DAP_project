@@ -1,2 +1,2 @@
 all:
-	gcc -std=gnu99 -o pda_project main.c -ljack -lfftw3 -lm -lsndfile -lsamplerate
+	g++ main.cpp -ljack -lfftw3 -lm -lsndfile -lsamplerate -o pda_project

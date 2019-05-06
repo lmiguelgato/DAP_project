@@ -31,12 +31,15 @@
 // libsamplerate (aka Secret Rabbit Code): library for performing sample rate conversion of audio data.
 #include <samplerate.h>
 
+// Eigen: C++ template library for linear algebra: matrices, vectors, numerical solvers, and related algorithms.
+//#include <Eigen/Eigen>
+
 // JACK:
 jack_port_t **output_ports;
 jack_client_t *client;
 
 // FFTW:
-double complex *i_fft, *i_time, *o_fft, *o_time;
+std::complex<double> *i_fft, *i_time, *o_fft, *o_time;
 fftw_plan i_forward, o_inverse;
 
 // Libsndfile:
@@ -147,7 +150,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	// i-FFT of the 1st window:
 	fftw_execute(o_inverse);
 	for(i = 0; i < window_size; ++i){
-		X_late[i] = creal(o_time[i])/window_size; //fftw3 requires normalizing its output
+		X_late[i] = real(o_time[i])/window_size; //fftw3 requires normalizing its output
 	}
 
 	// ---------------------------- 2nd window ------------------------------------------
@@ -166,7 +169,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	// i-FFT of the 2nd window:
 	fftw_execute(o_inverse);
 	for(i = 0; i < window_size; ++i){
-		X_early[i] = creal(o_time[i])/window_size; //fftw3 requires normalizing its output
+		X_early[i] = real(o_time[i])/window_size; //fftw3 requires normalizing its output
 	}
 
 	// --------------------------------------------------------------------------------
@@ -259,15 +262,15 @@ int main (int argc, char *argv[]) {
 	X_full	= (jack_default_audio_sample_t *) calloc(window_size + window_size/2, sizeof(jack_default_audio_sample_t));
 
 	// - FFTW3 buffers
-	i_fft 	= (double complex *) fftw_malloc(sizeof(double complex) * window_size);
-	i_time 	= (double complex *) fftw_malloc(sizeof(double complex) * window_size);
-	o_fft 	= (double complex *) fftw_malloc(sizeof(double complex) * window_size);
-	o_time 	= (double complex *) fftw_malloc(sizeof(double complex) * window_size);
-
-	sample_rate = (double) jack_get_sample_rate(client);	
+	i_fft = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
+	i_time = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
+	o_fft = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
+	o_time = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
 	
-	i_forward = fftw_plan_dft_1d(window_size, i_time, i_fft , FFTW_FORWARD, FFTW_MEASURE);
-	o_inverse = fftw_plan_dft_1d(window_size, o_fft , o_time, FFTW_BACKWARD, FFTW_MEASURE);
+	i_forward = fftw_plan_dft_1d(window_size, reinterpret_cast<fftw_complex*>(i_time), reinterpret_cast<fftw_complex*>(i_fft), FFTW_FORWARD, FFTW_MEASURE);
+	o_inverse = fftw_plan_dft_1d(window_size, reinterpret_cast<fftw_complex*>(o_fft), reinterpret_cast<fftw_complex*>(o_time), FFTW_BACKWARD, FFTW_MEASURE);
+	
+	sample_rate = (double) jack_get_sample_rate(client);
 
 	// - hann window
 	hann = (jack_default_audio_sample_t *) calloc(window_size, sizeof(jack_default_audio_sample_t)); 
