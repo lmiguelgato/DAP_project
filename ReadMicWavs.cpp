@@ -90,18 +90,21 @@ int process ( jack_nframes_t jack_buffer_size, void *arg ) {
 
 				pDataOut[j][i] = 0.0;
 	
-				if (ended == false){
-					cout << "ReadMicWavs: Finished playing." << endl;
+				if (!ended){
 					ended = true;
+					break;
     			}
 			}else{
 				pDataOut[j][i] = (jack_default_audio_sample_t)read_buffer[j][i];
 			}
 			wavs_i[j]++;
 		}
+		/*if (ended){
+			break;
+		}*/
 	}
 
-	if (ended == true){
+	if (ended && !READ_ENDED){
 		cout << "ReadMicWavs: Finished playing." << endl;
 		READ_ENDED = true;
 	}

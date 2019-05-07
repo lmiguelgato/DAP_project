@@ -233,7 +233,7 @@ int main (int argc, char *argv[]) {
 
 	input_ports = (jack_port_t**) malloc(n_in_channels*sizeof(jack_port_t*));
 	for(i = 0; i < n_in_channels; ++i) {
-		sprintf(portname, "microphone_%d", i+1);
+		sprintf(portname, "wav_mic%d", i+1);
 		input_ports[i] = jack_port_register (client, portname, JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
 		if (input_ports[i] == NULL) {
 			printf("No more JACK ports available after creating input port number %d\n",i);
