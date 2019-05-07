@@ -21,7 +21,7 @@
     %theta   = linspace(theta_0/180*pi, theta_N/180*pi, N_theta) + 0.2*randn(1, N_theta);
     
     % Reception
-    N_FFT   = 1024;
+    N_FFT   = 512;
     
     n1      = N_FFT/2;
     L1      = L;
@@ -55,8 +55,11 @@
         
         % Correlation receiver
         sn1 = xcorr(xn1(n1:n2), xn2(n1:n2));
+        sn2 = ifft(   fft([xn1(n1:n2); zeros(2*N_FFT,1)]) ...
+            .*conj(   fft([xn2(n1:n2); zeros(2*N_FFT,1)]) ));
         
         [m1, id1] = max(sn1);
+        [m2, id2] = max(sn2);
         
         % Estimation of times
         t_est1 = (N_FFT*2 - id1)/fs;

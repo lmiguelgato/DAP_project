@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "tools/max.h"
 
 // JACK: professional sound server daemon that provides real-time, 
 //       low-latency connections for both audio and MIDI data between applications that use its API.
@@ -33,8 +34,9 @@ jack_port_t **output_ports;
 jack_client_t *client;
 
 // FFTW:
-std::complex<double> *i_fft, *i_time, *o_fft, *o_time;
-fftw_plan i_forward, o_inverse;
+std::complex<double> *i_fft_4N, *i_time_4N, *o_fft_4N, *o_time_4N;
+std::complex<double> *i_fft_2N, *i_time_2N, *o_fft_2N, *o_time_2N;
+fftw_plan i_forward_4N, o_inverse_4N, i_forward_2N, o_inverse_2N;
 
 // default parameters:
 double sample_rate  = 48000.0;			// default sample rate
@@ -47,10 +49,13 @@ unsigned int n_in_channels = 3;			// number of input channels
 jack_default_audio_sample_t *hann;		// array to store the Hann window
 
 // overlap-add registers:
-jack_default_audio_sample_t **X_late;
-jack_default_audio_sample_t **X_early;
-jack_default_audio_sample_t **X_full;
+jack_default_audio_sample_t **X_full;	// store the 6 last buffers of 'nframes' samples
+jack_default_audio_sample_t **X_late;	// store the 4 latest buffers from X_full
+jack_default_audio_sample_t **X_early;	// store the 4 earliest buffers from X_full
 
+// GCC registers:
+std::complex<double> **X_gcc;			// store GCC result (length 2 times 'nframes')
+std::complex<double> *Aux_gcc;			// store axuliary GCC result (length 2 times 'nframes')
 
 /**
  * The process callback for this JACK application is called in a
@@ -75,8 +80,9 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	for(i = 0; i < n_out_channels; ++i)
 		out[i] = (jack_default_audio_sample_t *)jack_port_get_buffer (output_ports[i], nframes);
 
-	// shift windows to perform overlap-add:
 	for (j = 0; j < n_in_channels; ++j) {
+
+		// shift-register (useful for overlap-add method):
 		for (i = 0; i < nframes; ++i)
 		{
 			X_full[j][i] 				= X_full[j][nframes + i];
@@ -84,47 +90,88 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 			X_full[j][2*nframes + i] 	= X_full[j][3*nframes + i];
 			X_full[j][3*nframes + i] 	= X_full[j][4*nframes + i];
 			X_full[j][4*nframes + i] 	= X_full[j][5*nframes + i];
-			X_full[j][5*nframes + i] 	= in[j][i];
+			X_full[j][5*nframes + i] 	= in[j][i];	
 		}
 
-		// ---------------------------- 1st window ------------------------------------------
-
-		// FFT of the 1st window:
-		for(i = 0; i < window_size; ++i){
-			i_time[i] = X_full[j][i]*hann[i];
+		// cross-correlation in four steps:
+		// 1- zero padding:
+		for (i = 0; i < nframes; ++i)
+		{
+			i_time_2N[i] = X_full[j][i];
 		}
-		fftw_execute(i_forward);
-		
-		// processing of the 1st window in frequency domain:
-		for(i = 0; i < window_size; ++i){
-			o_fft[i] = i_fft[i];
+		for (i = nframes; i < 2*nframes; ++i)
+		{
+			i_time_2N[i] = 0.0;
 		}
-		
-		// i-FFT of the 1st window:
-		fftw_execute(o_inverse);
-		for(i = 0; i < window_size; ++i){
-			X_late[j][i] = real(o_time[i])/window_size; //fftw3 requires normalizing its output
-		}
-
-		// ---------------------------- 2nd window ------------------------------------------
-
-		// FFT of the 2nd window:
-		for(i = 0; i < window_size; ++i){
-			i_time[i] = X_full[j][2*nframes+i]*hann[i];
-		}
-		fftw_execute(i_forward);
-		
-		// processing of the 2nd window in frequency domain:
-		for(i = 0; i < window_size; ++i){
-			o_fft[i] = i_fft[i];
-		}
-		
-		// i-FFT of the 2nd window:
-		fftw_execute(o_inverse);
-		for(i = 0; i < window_size; ++i){
-			X_early[j][i] = real(o_time[i])/window_size; //fftw3 requires normalizing its output
+		// 2- apply FFT:
+		fftw_execute(i_forward_2N);
+		for (i = 0; i < 2*nframes; ++i)
+		{
+			X_gcc[j][i] = i_fft_2N[i];
 		}
 	}
+
+	// 3- multiply pairs of FFTs (time reversing one them), and
+	// 4- apply iFFT
+	for (i = 0; i < 2*nframes; ++i)
+	{
+		o_fft_2N[i] = X_gcc[0][i] * conj(X_gcc[1][i]);
+	}
+	fftw_execute(o_inverse_2N);
+	for (i = 0; i < 2*nframes; ++i)
+	{
+		Aux_gcc[i] = o_time_2N[i];
+	}
+
+	for (i = 0; i < 2*nframes; ++i)
+	{
+		o_fft_2N[i] = X_gcc[1][i] * conj(X_gcc[2][i]);
+	}
+	fftw_execute(o_inverse_2N);
+	for (i = 0; i < 2*nframes; ++i)
+	{
+		X_gcc[1][i] = Aux_gcc[i];
+		Aux_gcc[i] = o_time_2N[i];
+	}
+
+	for (i = 0; i < 2*nframes; ++i)
+	{
+		o_fft_2N[i] = X_gcc[2][i] * conj(X_gcc[0][i]);
+	}
+	fftw_execute(o_inverse_2N);
+	for (i = 0; i < 2*nframes; ++i)
+	{
+		X_gcc[2][i] = Aux_gcc[i];
+		X_gcc[0][i] = o_time_2N[i];
+	}
+
+	// find maximum of the cross-correlation:
+
+	int max_idx12, max_idx23, max_idx31;
+	double max_val12, max_val23, max_val31;
+
+	max_idx12 = max(X_gcc[1], window_size, &max_val12);
+	max_idx23 = max(X_gcc[2], window_size, &max_val23);
+	max_idx31 = max(X_gcc[0], window_size, &max_val31);
+
+	double dt12, dt23, dt31;
+
+	if (max_idx12 < nframes)
+		dt12 = (1.0 - (double) max_idx12)/sample_rate;
+	else
+		dt12 = ((double) 2*nframes - max_idx12 + 1.0)/sample_rate;
+
+	if (max_idx23 < nframes)
+		dt23 = (1.0 - (double) max_idx23)/sample_rate;
+	else
+		dt23 = ((double) 2*nframes - max_idx23 + 1.0)/sample_rate;
+
+	if (max_idx31 < nframes)
+		dt31 = (1.0 - (double) max_idx31)/sample_rate;
+	else
+		dt31 = ((double)  2*nframes - max_idx31 + 1.0)/sample_rate;
+
+	printf("t1 = %1.6f\t t2 = %1.6f\t t3 = %1.6f\n", dt12, dt23, dt31);
 
 	// perform overlap-add:
 	for (k = 0; k < n_out_channels; ++k) {
@@ -132,7 +179,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 			out[k][i] = 0;			
 			for (j = 0; j < n_in_channels; ++j)
 			{
-				out[k][i] += X_late[j][i+2*nframes+nframes/2] + X_early[j][i+nframes/2];				
+				out[k][i] += in[j][i];
 			}
 		}
 	}
@@ -191,21 +238,32 @@ int main (int argc, char *argv[]) {
 	X_late	= (jack_default_audio_sample_t **) calloc(n_in_channels, sizeof(jack_default_audio_sample_t*));
 	X_early	= (jack_default_audio_sample_t **) calloc(n_in_channels, sizeof(jack_default_audio_sample_t*));
 	X_full	= (jack_default_audio_sample_t **) calloc(n_in_channels, sizeof(jack_default_audio_sample_t*));
+	X_gcc	= (std::complex<double> **) calloc(n_in_channels, sizeof(std::complex<double>*));
+	Aux_gcc	= (std::complex<double> *) calloc(window_size/2, sizeof(std::complex<double>));
 
     for (i = 0; i < n_in_channels; ++i) {
         X_late[i]	= (jack_default_audio_sample_t *) calloc(window_size, sizeof(jack_default_audio_sample_t));
 		X_early[i]	= (jack_default_audio_sample_t *) calloc(window_size, sizeof(jack_default_audio_sample_t));
 		X_full[i]	= (jack_default_audio_sample_t *) calloc(window_size + window_size/2, sizeof(jack_default_audio_sample_t));
+		X_gcc[i]	= (std::complex<double> *) calloc(window_size/2, sizeof(std::complex<double>));
     }	
 
 	// - FFTW3 buffers
-	i_fft = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
-	i_time = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
-	o_fft = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
-	o_time = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
+	i_fft_4N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
+	i_time_4N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
+	o_fft_4N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
+	o_time_4N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
 	
-	i_forward = fftw_plan_dft_1d(window_size, reinterpret_cast<fftw_complex*>(i_time), reinterpret_cast<fftw_complex*>(i_fft), FFTW_FORWARD, FFTW_MEASURE);
-	o_inverse = fftw_plan_dft_1d(window_size, reinterpret_cast<fftw_complex*>(o_fft), reinterpret_cast<fftw_complex*>(o_time), FFTW_BACKWARD, FFTW_MEASURE);
+	i_forward_4N = fftw_plan_dft_1d(window_size, reinterpret_cast<fftw_complex*>(i_time_4N), reinterpret_cast<fftw_complex*>(i_fft_4N), FFTW_FORWARD, FFTW_MEASURE);
+	o_inverse_4N = fftw_plan_dft_1d(window_size, reinterpret_cast<fftw_complex*>(o_fft_4N), reinterpret_cast<fftw_complex*>(o_time_4N), FFTW_BACKWARD, FFTW_MEASURE);
+
+	i_fft_2N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size/2);
+	i_time_2N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size/2);
+	o_fft_2N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size/2);
+	o_time_2N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size/2);
+
+	i_forward_2N = fftw_plan_dft_1d(window_size/2, reinterpret_cast<fftw_complex*>(i_time_2N), reinterpret_cast<fftw_complex*>(i_fft_2N), FFTW_FORWARD, FFTW_MEASURE);
+	o_inverse_2N = fftw_plan_dft_1d(window_size/2, reinterpret_cast<fftw_complex*>(o_fft_2N), reinterpret_cast<fftw_complex*>(o_time_2N), FFTW_BACKWARD, FFTW_MEASURE);
 	
 	sample_rate = (double) jack_get_sample_rate(client);
 
