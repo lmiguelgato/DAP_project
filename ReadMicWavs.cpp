@@ -85,10 +85,7 @@ int process ( jack_nframes_t jack_buffer_size, void *arg ) {
 	for (i=0;i<jack_buffer_size;i++){
 		for (j=0;j<channels;j++){
 		    if (read_count[j] != jack_buffer_size && i >= read_count[j]){
-				// Finished reading file
-				// Completing the buffer with silence
-
-				pDataOut[j][i] = 0.0;
+				pDataOut[j][i] = 0.0; 	// Finished reading file, completing the buffer with silence
 	
 				if (!ended){
 					ended = true;
@@ -99,9 +96,6 @@ int process ( jack_nframes_t jack_buffer_size, void *arg ) {
 			}
 			wavs_i[j]++;
 		}
-		/*if (ended){
-			break;
-		}*/
 	}
 
 	if (ended && !READ_ENDED){

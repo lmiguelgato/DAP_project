@@ -127,12 +127,12 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	}
 
 	// perform overlap-add:
-	for (k = 0; j < n_out_channels; ++j) {
+	for (k = 0; k < n_out_channels; ++k) {
 		for (i = 0; i < nframes; ++i) {
 			out[k][i] = 0;			
 			for (j = 0; j < n_in_channels; ++j)
 			{
-				out[k][i] += X_late[j][i+2*nframes+nframes/2] + X_early[j][i+nframes/2];
+				out[k][i] += X_late[j][i+2*nframes+nframes/2] + X_early[j][i+nframes/2];				
 			}
 		}
 	}
