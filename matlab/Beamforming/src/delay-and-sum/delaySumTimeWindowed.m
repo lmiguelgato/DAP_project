@@ -7,8 +7,8 @@ close all
 clear
 clc
 
-addpath('..\tools')
-addpath('..\tools\bss_eval')
+addpath('../tools')
+addpath('../tools/bss_eval')
 
 %% Parameters:
 winSel  = 1;
@@ -31,7 +31,7 @@ doa     = theta * pi/180;       % vector of directions of arrival (radians)
 
 k = 1;                          % index of signal to be separated
 
-c       = soundSpeed();         % speed of sound (m/s, t = 20°C by default)
+c       = soundSpeed();         % speed of sound (m/s, t = 20ï¿½C by default)
 lambda  = c./f;                 % wavelength (meters)
 
 M       = 3;                   % number of sensors
@@ -68,9 +68,9 @@ end
 % The beamformer can only distinguish two sources with DOA separation
 % larger than half of 'thetaBW'.
 if winSel == 1
-disp(['Approximate Rayleigh bandwidth: ' num2str(thetaBW*180/pi) '°'])
+disp(['Approximate Rayleigh bandwidth: ' num2str(thetaBW*180/pi) 'ï¿½'])
 disp(['The DOA separation between two sources must be larger than: ' ...
-    num2str(thetaBW/2*180/pi) '°'])
+    num2str(thetaBW/2*180/pi) 'ï¿½'])
 end
 
 w = window(fhandle, M);

@@ -15,7 +15,7 @@
 #include <string.h>
 #include <math.h>
 #include "tools/max.h"
-#include "tools/angleDictionary.h"
+#include "tools/angleTranslation.h"
 
 // JACK: professional sound server daemon that provides real-time, 
 //       low-latency connections for both audio and MIDI data between applications that use its API.
@@ -156,24 +156,25 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	int max_idx12, max_idx23, max_idx31;
 	double max_val12, max_val23, max_val31;
 
-	max_idx12 = max(X_gcc[1], window_size, &max_val12);
-	max_idx23 = max(X_gcc[2], window_size, &max_val23);
-	max_idx31 = max(X_gcc[0], window_size, &max_val31);
+	max_idx12 = max(X_gcc[1], window_size/2, &max_val12);
+	max_idx23 = max(X_gcc[2], window_size/2, &max_val23);
+	max_idx31 = max(X_gcc[0], window_size/2, &max_val31);
 
 	double dt12, dt23, dt31;
 
 	if (max_idx12 < nframes)
-		dt12 = ((double) max_idx12)/sample_rate;
+		dt12 = -((double) max_idx12)/sample_rate;
 	else
 		dt12 = ((double) 2*nframes - max_idx12)/sample_rate;
 
 	if (max_idx23 < nframes)
-		dt23 = ((double) max_idx23)/sample_rate;
+		dt23 = -((double) max_idx23)/sample_rate;
 	else
 		dt23 = ((double) 2*nframes - max_idx23)/sample_rate;
 
-	if (max_idx31 < nframes)
-		dt31 = ((double) max_idx31)/sample_rate;
+	if (max_idx31 < nframes) {
+		dt31 = -((double) max_idx31)/sample_rate;
+	}
 	else
 		dt31 = ((double)  2*nframes - max_idx31)/sample_rate;
 
@@ -193,34 +194,15 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		dt31 = -dt_max;
 
 	double theta[6] = {asin(dt12/dt_max)*RAD2DEG,
-					   asin(dt23/dt_max)*RAD2DEG + 120.0,
-					   asin(dt31/dt_max)*RAD2DEG - 120.0,
+					   asin(dt23/dt_max)*RAD2DEG,
+					   asin(dt31/dt_max)*RAD2DEG,
 					   0.0,
 					   0.0,
 					   0.0};
 
-	for (i = 0; i < 3; ++i) {
-		if (theta[i] >= 180.0) {
-			theta[i] -= 360.0;
-		}
-		if (theta[i] < -180.0) {
-			theta[i] += 360.0;
-		}
-
-		if (theta[i] <= 0.0) {
-			theta[i+3] = 180.0 + theta[i];
-		}
-		if (theta[i] > 0.0) {
-			theta[i+3] = theta[i] - 180.0;
-		}		
-	}
-
-	//angleDictionary (theta);
+	angleTranslation(theta);
 
 	printf("theta1 = [%1.5f, %1.5f];\ttheta2 = [%1.5f, %1.5f];\ttheta3 = [%1.5f, %1.5f]\n", theta[0], theta[3], theta[1], theta[4], theta[2], theta[5]);
-
-
-	//printf("theta1 = %1.6f\t theta2 = %1.6f\t theta3 = %1.6f\n", theta12, theta23, theta31);
 
 	// perform overlap-add:
 	for (k = 0; k < n_out_channels; ++k) {
