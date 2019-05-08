@@ -15,6 +15,7 @@
 #include <string.h>
 #include <math.h>
 #include "tools/max.h"
+#include "tools/angleDictionary.h"
 
 // JACK: professional sound server daemon that provides real-time, 
 //       low-latency connections for both audio and MIDI data between applications that use its API.
@@ -27,6 +28,8 @@
 
 // Eigen: C++ template library for linear algebra: matrices, vectors, numerical solvers, and related algorithms.
 #include <Eigen/Eigen>
+
+#define RAD2DEG 57.295779513082323f
 
 // JACK:
 jack_port_t **input_ports;
@@ -42,6 +45,9 @@ fftw_plan i_forward_4N, o_inverse_4N, i_forward_2N, o_inverse_2N;
 double sample_rate  = 48000.0;			// default sample rate
 int nframes 		= 1024;				// default number of frames per jack buffer
 int window_size 	= 4096;				// default fft size (window_size must be four times nframes)
+double mic_separation = 0.1;			// default microphone separation [meters]
+double c = 343.364;						// default sound speed [m/s]
+double dt_max = mic_separation/c;		// maximum delay between microphones [s]
 
 unsigned int n_out_channels = 2;		// number of output channels
 unsigned int n_in_channels = 3;			// number of input channels
@@ -157,21 +163,64 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	double dt12, dt23, dt31;
 
 	if (max_idx12 < nframes)
-		dt12 = (1.0 - (double) max_idx12)/sample_rate;
+		dt12 = ((double) max_idx12)/sample_rate;
 	else
-		dt12 = ((double) 2*nframes - max_idx12 + 1.0)/sample_rate;
+		dt12 = ((double) 2*nframes - max_idx12)/sample_rate;
 
 	if (max_idx23 < nframes)
-		dt23 = (1.0 - (double) max_idx23)/sample_rate;
+		dt23 = ((double) max_idx23)/sample_rate;
 	else
-		dt23 = ((double) 2*nframes - max_idx23 + 1.0)/sample_rate;
+		dt23 = ((double) 2*nframes - max_idx23)/sample_rate;
 
 	if (max_idx31 < nframes)
-		dt31 = (1.0 - (double) max_idx31)/sample_rate;
+		dt31 = ((double) max_idx31)/sample_rate;
 	else
-		dt31 = ((double)  2*nframes - max_idx31 + 1.0)/sample_rate;
+		dt31 = ((double)  2*nframes - max_idx31)/sample_rate;
 
-	printf("t1 = %1.6f\t t2 = %1.6f\t t3 = %1.6f\n", dt12, dt23, dt31);
+	if (dt12 > dt_max)
+		dt12 = dt_max;
+	if (dt12 < -dt_max)
+		dt12 = -dt_max;
+
+	if (dt23 > dt_max)
+		dt23 = dt_max;
+	if (dt23 < -dt_max)
+		dt23 = -dt_max;
+
+	if (dt31 > dt_max)
+		dt31 = dt_max;
+	if (dt31 < -dt_max)
+		dt31 = -dt_max;
+
+	double theta[6] = {asin(dt12/dt_max)*RAD2DEG,
+					   asin(dt23/dt_max)*RAD2DEG + 120.0,
+					   asin(dt31/dt_max)*RAD2DEG - 120.0,
+					   0.0,
+					   0.0,
+					   0.0};
+
+	for (i = 0; i < 3; ++i) {
+		if (theta[i] >= 180.0) {
+			theta[i] -= 360.0;
+		}
+		if (theta[i] < -180.0) {
+			theta[i] += 360.0;
+		}
+
+		if (theta[i] <= 0.0) {
+			theta[i+3] = 180.0 + theta[i];
+		}
+		if (theta[i] > 0.0) {
+			theta[i+3] = theta[i] - 180.0;
+		}		
+	}
+
+	//angleDictionary (theta);
+
+	printf("theta1 = [%1.5f, %1.5f];\ttheta2 = [%1.5f, %1.5f];\ttheta3 = [%1.5f, %1.5f]\n", theta[0], theta[3], theta[1], theta[4], theta[2], theta[5]);
+
+
+	//printf("theta1 = %1.6f\t theta2 = %1.6f\t theta3 = %1.6f\n", theta12, theta23, theta31);
 
 	// perform overlap-add:
 	for (k = 0; k < n_out_channels; ++k) {
@@ -200,6 +249,16 @@ void jack_shutdown (void *arg){
 int main (int argc, char *argv[]) {
 
 	int i;
+
+	if(argc != 2){
+		printf ("Microphone separation not provided.\n");
+		exit(1);
+	}
+
+	mic_separation = atof(argv[1]);
+	printf("\nMicrophone separation: %1.4f meters\n\n", mic_separation);	
+
+	dt_max = mic_separation/c;
 
 	const char *client_name = "jack_doa_beamformer";
 	jack_options_t options = JackNoStartServer;
