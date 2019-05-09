@@ -17,6 +17,7 @@
 #include "tools/max.h"
 #include "tools/angleTranslation.h"
 #include "tools/unwrap.h"
+#include "tools/phat.h"
 
 // JACK: professional sound server daemon that provides real-time, 
 //       low-latency connections for both audio and MIDI data between applications that use its API.
@@ -31,6 +32,7 @@
 #include <Eigen/Eigen>
 
 #define RAD2DEG 57.295779513082323f
+#define GCC_STYLE 1			// 1: GCC, 2:GCC (frequency restrained), 3:GCC-PHAT, 4:GCC-PHAT (frequency restrained)
 
 // JACK:
 jack_port_t **input_ports;
@@ -43,12 +45,16 @@ std::complex<double> *i_fft_2N, *i_time_2N, *o_fft_2N, *o_time_2N;
 fftw_plan i_forward_4N, o_inverse_4N, i_forward_2N, o_inverse_2N;
 
 // default parameters:
-double sample_rate  = 48000.0;			// default sample rate
+double sample_rate  = 48000.0;			// default sample rate [Hz]
 int nframes 		= 1024;				// default number of frames per jack buffer
 int window_size, window_size_2;			// fft size (window_size must be four times nframes)
 double mic_separation = 0.1;			// default microphone separation [meters]
 double c = 343.364;						// default sound speed [m/s]
 double dt_max, N_max;					// maximum delay between microphones [s, samples]
+
+double f_min = 1000.0;					// minimum frequency of the desired signal [Hz]
+double f_max = 4000.0;					// maximum frequency of the desired signal [Hz]
+int kmin, kmax;							// discrete minimum and maximum frequencies of the desired signal
 
 unsigned int n_out_channels = 2;		// number of output channels
 unsigned int n_in_channels = 3;			// number of input channels
@@ -92,62 +98,49 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		// shift-register (useful for overlap-add method):
 		for (i = 0; i < nframes; ++i)
 		{
-			X_full[j][i] 				= X_full[j][nframes + i];
-			X_full[j][nframes + i] 		= X_full[j][2*nframes + i];
-			X_full[j][2*nframes + i] 	= X_full[j][3*nframes + i];
-			X_full[j][3*nframes + i] 	= X_full[j][4*nframes + i];
-			X_full[j][4*nframes + i] 	= X_full[j][5*nframes + i];
-			X_full[j][5*nframes + i] 	= in[j][i];	
+			X_full[j][i] 						= X_full[j][nframes + i];
+			X_full[j][nframes + i] 				= X_full[j][window_size_2 + i];
+			X_full[j][window_size_2 + i] 		= X_full[j][window_size-nframes + i];
+			X_full[j][window_size-nframes + i] 	= X_full[j][window_size + i];
+			X_full[j][window_size + i] 			= X_full[j][window_size+nframes + i];
+			X_full[j][window_size+nframes + i] 	= in[j][i];	
 		}
 
 		// cross-correlation in four steps:
 		// 1- zero padding:
 		for (i = 0; i < nframes; ++i)
-		{
 			i_time_2N[i] = X_full[j][i];
-		}
-		for (i = nframes; i < 2*nframes; ++i)
-		{
+
+		for (i = nframes; i < window_size_2; ++i)
 			i_time_2N[i] = 0.0;
-		}
+
 		// 2- apply FFT:
 		fftw_execute(i_forward_2N);
-		for (i = 0; i < 2*nframes; ++i)
-		{
+
+		for (i = 0; i < window_size_2; ++i)
 			X_gcc[j][i] = i_fft_2N[i];
-		}
 	}
 
 	// 3- multiply pairs of FFTs (time reversing one them), and
 	// 4- apply iFFT
-	for (i = 0; i < 2*nframes; ++i)
-	{
-		o_fft_2N[i] = X_gcc[0][i] * conj(X_gcc[1][i]);
-	}
+	phat (o_fft_2N, X_gcc[0], X_gcc[1], window_size_2, kmin, kmax, GCC_STYLE);
 	fftw_execute(o_inverse_2N);
-	for (i = 0; i < 2*nframes; ++i)
-	{
-		Aux_gcc[i] = o_time_2N[i];
-	}
 
-	for (i = 0; i < 2*nframes; ++i)
-	{
-		o_fft_2N[i] = X_gcc[1][i] * conj(X_gcc[2][i]);
-	}
+	for (i = 0; i < window_size_2; ++i)
+		Aux_gcc[i] = o_time_2N[i];
+
+	phat (o_fft_2N, X_gcc[1], X_gcc[2], window_size_2, kmin, kmax, GCC_STYLE);
 	fftw_execute(o_inverse_2N);
-	for (i = 0; i < 2*nframes; ++i)
-	{
+
+	for (i = 0; i < window_size_2; ++i) {
 		X_gcc[1][i] = Aux_gcc[i];
 		Aux_gcc[i] = o_time_2N[i];
 	}
 
-	for (i = 0; i < 2*nframes; ++i)
-	{
-		o_fft_2N[i] = X_gcc[2][i] * conj(X_gcc[0][i]);
-	}
+	phat (o_fft_2N, X_gcc[2], X_gcc[0], window_size_2, kmin, kmax, GCC_STYLE);
 	fftw_execute(o_inverse_2N);
-	for (i = 0; i < 2*nframes; ++i)
-	{
+
+	for (i = 0; i < window_size_2; ++i) {
 		X_gcc[2][i] = Aux_gcc[i];
 		X_gcc[0][i] = o_time_2N[i];
 	}
@@ -169,9 +162,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		for (i = 0; i < nframes; ++i) {
 			out[k][i] = 0;			
 			for (j = 0; j < n_in_channels; ++j)
-			{
 				out[k][i] += in[j][i];
-			}
 		}
 	}
 	
@@ -235,6 +226,8 @@ int main (int argc, char *argv[]) {
 	nframes 	= (int) jack_get_buffer_size (client);
 	window_size = 4*nframes;
 	window_size_2 = 2*nframes;
+	kmin = (int) (f_min/sample_rate*window_size_2);
+	kmax = (int) (f_max/sample_rate*window_size_2);
 
 	// initialization of internal buffers
 	// - overlap-add buffers
