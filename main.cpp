@@ -18,6 +18,7 @@
 #include "tools/angleTranslation.h"
 #include "tools/unwrap.h"
 #include "tools/phat.h"
+#include "tools/angleRedundancy.h"
 
 // JACK: professional sound server daemon that provides real-time, 
 //       low-latency connections for both audio and MIDI data between applications that use its API.
@@ -51,6 +52,7 @@ int window_size, window_size_2;			// fft size (window_size must be four times nf
 double mic_separation = 0.1;			// default microphone separation [meters]
 double c = 343.364;						// default sound speed [m/s]
 double dt_max, N_max;					// maximum delay between microphones [s, samples]
+double doa;								// direction of arrival
 
 double f_min = 1000.0;					// minimum frequency of the desired signal [Hz]
 double f_max = 4000.0;					// maximum frequency of the desired signal [Hz]
@@ -155,7 +157,15 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 
 	angleTranslation(theta);	// use a coherent reference to measure DOA
 
+	double thetaRedundant[3] = {0.0, 0.0, 0.0};
+
+	doa = angleRedundancy (theta, thetaRedundant, 20.0);
+
 	printf("theta1 = [%1.5f, %1.5f];\ttheta2 = [%1.5f, %1.5f];\ttheta3 = [%1.5f, %1.5f]\n", theta[0], theta[3], theta[1], theta[4], theta[2], theta[5]);
+	if (doa != 181.0) {
+		printf("thetaR = [%1.5f, %1.5f, %1.5f]\n", thetaRedundant[0], thetaRedundant[1], thetaRedundant[2]);
+		printf("*** DOA = %1.5f\n", doa);	
+	}
 
 	// perform overlap-add:
 	for (k = 0; k < n_out_channels; ++k) {
