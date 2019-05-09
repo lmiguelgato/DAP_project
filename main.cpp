@@ -16,6 +16,7 @@
 #include <math.h>
 #include "tools/max.h"
 #include "tools/angleTranslation.h"
+#include "tools/unwrap.h"
 
 // JACK: professional sound server daemon that provides real-time, 
 //       low-latency connections for both audio and MIDI data between applications that use its API.
@@ -44,10 +45,10 @@ fftw_plan i_forward_4N, o_inverse_4N, i_forward_2N, o_inverse_2N;
 // default parameters:
 double sample_rate  = 48000.0;			// default sample rate
 int nframes 		= 1024;				// default number of frames per jack buffer
-int window_size 	= 4096;				// default fft size (window_size must be four times nframes)
+int window_size, window_size_2;			// fft size (window_size must be four times nframes)
 double mic_separation = 0.1;			// default microphone separation [meters]
 double c = 343.364;						// default sound speed [m/s]
-double dt_max = mic_separation/c;		// maximum delay between microphones [s]
+double dt_max, N_max;					// maximum delay between microphones [s, samples]
 
 unsigned int n_out_channels = 2;		// number of output channels
 unsigned int n_in_channels = 3;			// number of input channels
@@ -151,56 +152,15 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		X_gcc[0][i] = o_time_2N[i];
 	}
 
-	// find maximum of the cross-correlation:
-
-	int max_idx12, max_idx23, max_idx31;
-	double max_val12, max_val23, max_val31;
-
-	max_idx12 = max(X_gcc[1], window_size/2, &max_val12);
-	max_idx23 = max(X_gcc[2], window_size/2, &max_val23);
-	max_idx31 = max(X_gcc[0], window_size/2, &max_val31);
-
-	double dt12, dt23, dt31;
-
-	if (max_idx12 < nframes)
-		dt12 = -((double) max_idx12)/sample_rate;
-	else
-		dt12 = ((double) 2*nframes - max_idx12)/sample_rate;
-
-	if (max_idx23 < nframes)
-		dt23 = -((double) max_idx23)/sample_rate;
-	else
-		dt23 = ((double) 2*nframes - max_idx23)/sample_rate;
-
-	if (max_idx31 < nframes) {
-		dt31 = -((double) max_idx31)/sample_rate;
-	}
-	else
-		dt31 = ((double)  2*nframes - max_idx31)/sample_rate;
-
-	if (dt12 > dt_max)
-		dt12 = dt_max;
-	if (dt12 < -dt_max)
-		dt12 = -dt_max;
-
-	if (dt23 > dt_max)
-		dt23 = dt_max;
-	if (dt23 < -dt_max)
-		dt23 = -dt_max;
-
-	if (dt31 > dt_max)
-		dt31 = dt_max;
-	if (dt31 < -dt_max)
-		dt31 = -dt_max;
-
-	double theta[6] = {asin(dt12/dt_max)*RAD2DEG,
-					   asin(dt23/dt_max)*RAD2DEG,
-					   asin(dt31/dt_max)*RAD2DEG,
+	// find maximum of the cross-correlations, and estimate DOA:
+	double theta[6] = {asin(  unwrap(  max(X_gcc[1], window_size_2), nframes, N_max  )/N_max  )*RAD2DEG,
+					   asin(  unwrap(  max(X_gcc[2], window_size_2), nframes, N_max  )/N_max  )*RAD2DEG,
+					   asin(  unwrap(  max(X_gcc[0], window_size_2), nframes, N_max  )/N_max  )*RAD2DEG,
 					   0.0,
 					   0.0,
 					   0.0};
 
-	angleTranslation(theta);
+	angleTranslation(theta);	// use a coherent reference to measure DOA
 
 	printf("theta1 = [%1.5f, %1.5f];\ttheta2 = [%1.5f, %1.5f];\ttheta3 = [%1.5f, %1.5f]\n", theta[0], theta[3], theta[1], theta[4], theta[2], theta[5]);
 
@@ -241,6 +201,7 @@ int main (int argc, char *argv[]) {
 	printf("\nMicrophone separation: %1.4f meters\n\n", mic_separation);	
 
 	dt_max = mic_separation/c;
+	N_max = dt_max*sample_rate;
 
 	const char *client_name = "jack_doa_beamformer";
 	jack_options_t options = JackNoStartServer;
@@ -273,6 +234,7 @@ int main (int argc, char *argv[]) {
 	// obtain here the delay from user and store it in 'delay' 
 	nframes 	= (int) jack_get_buffer_size (client);
 	window_size = 4*nframes;
+	window_size_2 = 2*nframes;
 
 	// initialization of internal buffers
 	// - overlap-add buffers
@@ -280,13 +242,13 @@ int main (int argc, char *argv[]) {
 	X_early	= (jack_default_audio_sample_t **) calloc(n_in_channels, sizeof(jack_default_audio_sample_t*));
 	X_full	= (jack_default_audio_sample_t **) calloc(n_in_channels, sizeof(jack_default_audio_sample_t*));
 	X_gcc	= (std::complex<double> **) calloc(n_in_channels, sizeof(std::complex<double>*));
-	Aux_gcc	= (std::complex<double> *) calloc(window_size/2, sizeof(std::complex<double>));
+	Aux_gcc	= (std::complex<double> *) calloc(window_size_2, sizeof(std::complex<double>));
 
     for (i = 0; i < n_in_channels; ++i) {
         X_late[i]	= (jack_default_audio_sample_t *) calloc(window_size, sizeof(jack_default_audio_sample_t));
 		X_early[i]	= (jack_default_audio_sample_t *) calloc(window_size, sizeof(jack_default_audio_sample_t));
-		X_full[i]	= (jack_default_audio_sample_t *) calloc(window_size + window_size/2, sizeof(jack_default_audio_sample_t));
-		X_gcc[i]	= (std::complex<double> *) calloc(window_size/2, sizeof(std::complex<double>));
+		X_full[i]	= (jack_default_audio_sample_t *) calloc(window_size + window_size_2, sizeof(jack_default_audio_sample_t));
+		X_gcc[i]	= (std::complex<double> *) calloc(window_size_2, sizeof(std::complex<double>));
     }	
 
 	// - FFTW3 buffers
@@ -298,13 +260,13 @@ int main (int argc, char *argv[]) {
 	i_forward_4N = fftw_plan_dft_1d(window_size, reinterpret_cast<fftw_complex*>(i_time_4N), reinterpret_cast<fftw_complex*>(i_fft_4N), FFTW_FORWARD, FFTW_MEASURE);
 	o_inverse_4N = fftw_plan_dft_1d(window_size, reinterpret_cast<fftw_complex*>(o_fft_4N), reinterpret_cast<fftw_complex*>(o_time_4N), FFTW_BACKWARD, FFTW_MEASURE);
 
-	i_fft_2N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size/2);
-	i_time_2N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size/2);
-	o_fft_2N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size/2);
-	o_time_2N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size/2);
+	i_fft_2N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size_2);
+	i_time_2N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size_2);
+	o_fft_2N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size_2);
+	o_time_2N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size_2);
 
-	i_forward_2N = fftw_plan_dft_1d(window_size/2, reinterpret_cast<fftw_complex*>(i_time_2N), reinterpret_cast<fftw_complex*>(i_fft_2N), FFTW_FORWARD, FFTW_MEASURE);
-	o_inverse_2N = fftw_plan_dft_1d(window_size/2, reinterpret_cast<fftw_complex*>(o_fft_2N), reinterpret_cast<fftw_complex*>(o_time_2N), FFTW_BACKWARD, FFTW_MEASURE);
+	i_forward_2N = fftw_plan_dft_1d(window_size_2, reinterpret_cast<fftw_complex*>(i_time_2N), reinterpret_cast<fftw_complex*>(i_fft_2N), FFTW_FORWARD, FFTW_MEASURE);
+	o_inverse_2N = fftw_plan_dft_1d(window_size_2, reinterpret_cast<fftw_complex*>(o_fft_2N), reinterpret_cast<fftw_complex*>(o_time_2N), FFTW_BACKWARD, FFTW_MEASURE);
 	
 	sample_rate = (double) jack_get_sample_rate(client);
 
