@@ -32,8 +32,12 @@
 // Eigen: C++ template library for linear algebra: matrices, vectors, numerical solvers, and related algorithms.
 #include <Eigen/Eigen>
 
-#define RAD2DEG 57.295779513082323f
-#define GCC_STYLE 1			// 1: GCC, 2:GCC (frequency restrained), 3:GCC-PHAT, 4:GCC-PHAT (frequency restrained)
+#define RAD2DEG 57.295779513082323f		// useful to convert from radians to degrees
+#define GCC_STYLE 1						// 1: GCC, 2:GCC (frequency restrained), 3:GCC-PHAT, 4:GCC-PHAT (frequency restrained)
+#define GCC_TH 100.0f					// correlation threshold (to avoid false alarms)
+#define REDUNDANCY_TH 20.0f				// redundancy threshold (for DOA estimation)
+#define DEBUG false
+
 
 // JACK:
 jack_port_t **input_ports;
@@ -53,6 +57,11 @@ double mic_separation = 0.1;			// default microphone separation [meters]
 double c = 343.364;						// default sound speed [m/s]
 double dt_max, N_max;					// maximum delay between microphones [s, samples]
 double doa;								// direction of arrival
+double mean_doa = 0.0;					// average direction of arrival
+double std_doa = 90.0;					// standard deviation of the direction of arrival
+double std_cum = 90.0;					// standard deviation of the direction of arrival (cummulative)
+int counter = 0;
+bool detected = false;
 
 double f_min = 1000.0;					// minimum frequency of the desired signal [Hz]
 double f_max = 4000.0;					// maximum frequency of the desired signal [Hz]
@@ -147,10 +156,12 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		X_gcc[0][i] = o_time_2N[i];
 	}
 
+	double max_val12, max_val23, max_val31;
+
 	// find maximum of the cross-correlations, and estimate DOA:
-	double theta[6] = {asin(  unwrap(  max(X_gcc[1], window_size_2), nframes, N_max  )/N_max  )*RAD2DEG,
-					   asin(  unwrap(  max(X_gcc[2], window_size_2), nframes, N_max  )/N_max  )*RAD2DEG,
-					   asin(  unwrap(  max(X_gcc[0], window_size_2), nframes, N_max  )/N_max  )*RAD2DEG,
+	double theta[6] = {asin(  unwrap(  max(X_gcc[1], window_size_2, &max_val12), nframes, N_max  )/N_max  )*RAD2DEG,
+					   asin(  unwrap(  max(X_gcc[2], window_size_2, &max_val23), nframes, N_max  )/N_max  )*RAD2DEG,
+					   asin(  unwrap(  max(X_gcc[0], window_size_2, &max_val31), nframes, N_max  )/N_max  )*RAD2DEG,
 					   0.0,
 					   0.0,
 					   0.0};
@@ -159,12 +170,32 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 
 	double thetaRedundant[3] = {0.0, 0.0, 0.0};
 
-	doa = angleRedundancy (theta, thetaRedundant, 20.0);
+	doa = angleRedundancy (theta, thetaRedundant, REDUNDANCY_TH);
 
-	printf("theta1 = [%1.5f, %1.5f];\ttheta2 = [%1.5f, %1.5f];\ttheta3 = [%1.5f, %1.5f]\n", theta[0], theta[3], theta[1], theta[4], theta[2], theta[5]);
-	if (doa != 181.0) {
+	if (DEBUG)
+	{
+		printf("theta1 = [%1.5f, %1.5f];\ttheta2 = [%1.5f, %1.5f];\ttheta3 = [%1.5f, %1.5f]\n", theta[0], theta[3], theta[1], theta[4], theta[2], theta[5]);
+		printf("val1 = %1.5f;\tval2 = %1.5f;\tval3 = %1.5f\n", max_val12, max_val23, max_val31);
 		printf("thetaR = [%1.5f, %1.5f, %1.5f]\n", thetaRedundant[0], thetaRedundant[1], thetaRedundant[2]);
-		printf("*** DOA = %1.5f\n", doa);	
+	}
+	
+
+	if (doa != 181.0 && max_val12 > GCC_TH && max_val23 > GCC_TH && max_val31 > GCC_TH) {
+		if (!detected) {
+			++counter;
+			mean_doa = (mean_doa*(counter-1) + doa)/counter;
+			detected = true;
+		} else {
+			if (abs(doa-mean_doa)<2*std_doa)
+			{
+				++counter;
+				mean_doa = (mean_doa*(counter-1) + doa)/counter;
+				std_cum += pow(doa-mean_doa, 2);
+				std_doa =  sqrt( std_cum/counter );
+			}
+		}
+		
+		printf("*** DOA = %1.5f\t%1.5f\t%1.5f\n", doa, mean_doa, std_doa);	
 	}
 
 	// perform overlap-add:
