@@ -14,6 +14,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <iostream>
+#include <fstream>
+using namespace std;
 #include "tools/max.h"
 #include "tools/angleTranslation.h"
 #include "tools/unwrap.h"
@@ -89,6 +92,8 @@ double *DOA_mean;						// store DOA mean for each source
 double *DOA_stdev;						// store DOA standard deviation for each source
 int    *counter;						// store number of detections for each source
 int    icounter = 0;					// number of detections
+
+ofstream outputFile;
 
 /**
  * The process callback for this JACK application is called in a
@@ -251,8 +256,10 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		//if (DEBUG) {
 			for (i = 0; i < n_sources; ++i)
 			{
-				if (counter[i] > 0)
+				if (counter[i] > 0) {
 					printf("*** DOA[%d] = %1.5f\n", i, DOA_kmean[i]);	
+					outputFile << DOA_kmean[i] << endl;
+				}
 			}
 			printf("\n");	
 		//}
@@ -295,6 +302,10 @@ int main (int argc, char *argv[]) {
 	printf("\nMicrophone separation: %1.4f meters.", mic_separation);	
 	n_sources = atoi(argv[2]);
 	printf("\nExpected number of sources: %d.\n\n", n_sources);
+
+	char fileName[30];
+	sprintf(fileName, "debug_%ddata.txt", n_sources);
+	outputFile.open(fileName);
 
 	dt_max = mic_separation/c;
 	N_max = dt_max*sample_rate;
@@ -478,5 +489,6 @@ int main (int argc, char *argv[]) {
 	   they would be important to call.
 	*/
 	jack_client_close (client);
+	outputFile.close();
 	exit (0);
 }
