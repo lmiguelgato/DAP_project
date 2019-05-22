@@ -19,6 +19,7 @@
 #include "tools/unwrap.h"
 #include "tools/phat.h"
 #include "tools/angleRedundancy.h"
+#include "tools/kmeans.h"
 
 // JACK: professional sound server daemon that provides real-time, 
 //       low-latency connections for both audio and MIDI data between applications that use its API.
@@ -36,6 +37,7 @@
 #define GCC_STYLE 1						// 1: GCC, 2:GCC (frequency restrained), 3:GCC-PHAT, 4:GCC-PHAT (frequency restrained)
 #define GCC_TH 100.0f					// correlation threshold (to avoid false alarms)
 #define REDUNDANCY_TH 20.0f				// redundancy threshold (for DOA estimation)
+#define HISTLENGTH 20
 #define DEBUG false
 
 
@@ -60,8 +62,7 @@ double doa;								// direction of arrival
 double mean_doa = 0.0;					// average direction of arrival
 double std_doa = 90.0;					// standard deviation of the direction of arrival
 double std_cum = 90.0;					// standard deviation of the direction of arrival (cummulative)
-int counter = 0;
-bool detected = false;
+int n_sources = 1; 						// number of sources to be detected
 
 double f_min = 1000.0;					// minimum frequency of the desired signal [Hz]
 double f_max = 4000.0;					// maximum frequency of the desired signal [Hz]
@@ -80,6 +81,14 @@ jack_default_audio_sample_t **X_early;	// store the 4 earliest buffers from X_fu
 // GCC registers:
 std::complex<double> **X_gcc;			// store GCC result (length 2 times 'nframes')
 std::complex<double> *Aux_gcc;			// store axuliary GCC result (length 2 times 'nframes')
+
+// DOA registers:
+double *DOA_hist;						// store DOA history
+double *DOA_kmean;						// store DOA mean for each source (kmeans algorithm)
+double *DOA_mean;						// store DOA mean for each source
+double *DOA_stdev;						// store DOA standard deviation for each source
+int    *counter;						// store number of detections for each source
+int    icounter = 0;					// number of detections
 
 /**
  * The process callback for this JACK application is called in a
@@ -181,7 +190,52 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	
 
 	if (doa != 181.0 && max_val12 > GCC_TH && max_val23 > GCC_TH && max_val31 > GCC_TH) {
-		if (!detected) {
+		DOA_hist[icounter%HISTLENGTH] = doa;
+		++icounter;
+
+		if (icounter >= HISTLENGTH) {
+			kmeans (DOA_hist, DOA_kmean, counter, n_sources, HISTLENGTH);
+
+			/*for (i = 0; i < n_sources; ++i)
+			{
+				
+			}
+
+			if (icounter == HISTLENGTH) {
+				++icounter;
+				mean_doa = (mean_doa*(counter-1) + doa)/icounter;
+				detected = true;
+			} else {
+				if (abs(doa-mean_doa)<6*std_doa)
+				{
+					++icounter;
+					mean_doa = (mean_doa*(counter-1) + doa)/icounter;
+					std_cum += pow(doa-mean_doa, 2);
+					std_doa =  sqrt( std_cum/icounter );
+				}
+			}*/
+		}
+
+
+
+
+		/*for (i = 0; i < n_sources; ++i)
+		{
+			if (counter[i] == 0) {
+				++counter[i];
+				DOA_mean[i] = (DOA_mean[i]*counter[i] + doa)/(counter[i]+1);
+			} else {
+				if (abs(doa - DOA_mean[i])<3*sqrt( DOA_stdev[i]/counter[i] ))
+				{
+					++counter[i];
+					DOA_mean[i] = (DOA_mean[i]*counter[i] + doa)/(counter[i]+1);
+					DOA_stdev[i] += pow(doa - DOA_mean[i], 2);
+				}
+			}
+		}*/
+
+
+		/*if (!detected) {
 			++counter;
 			mean_doa = (mean_doa*(counter-1) + doa)/counter;
 			detected = true;
@@ -193,11 +247,17 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 				std_cum += pow(doa-mean_doa, 2);
 				std_doa =  sqrt( std_cum/counter );
 			}
-		}
-		if (DEBUG)
-			printf("*** DOA = %1.5f\t%1.5f\t%1.5f\n", doa, mean_doa, std_doa);	
-		else
-			printf("*** DOA = %1.5f\n", mean_doa);	
+		}*/
+		//if (DEBUG) {
+			for (i = 0; i < n_sources; ++i)
+			{
+				if (counter[i] > 0)
+					printf("*** DOA[%d] = %1.5f\n", i, DOA_kmean[i]);	
+			}
+			printf("\n");	
+		//}
+		//else
+		//	printf("*** DOA = %1.5f\n", mean_doa);	
 	}
 
 	// perform overlap-add:
@@ -226,13 +286,15 @@ int main (int argc, char *argv[]) {
 
 	int i;
 
-	if(argc != 2){
-		printf ("Microphone separation not provided.\n");
+	if(argc != 3){		
+		printf ("Usage:\ndap_project d N\nd: Microphone separation (in meters).\nN: Number of sources.\n");
 		exit(1);
 	}
 
 	mic_separation = atof(argv[1]);
-	printf("\nMicrophone separation: %1.4f meters\n\n", mic_separation);	
+	printf("\nMicrophone separation: %1.4f meters.", mic_separation);	
+	n_sources = atoi(argv[2]);
+	printf("\nExpected number of sources: %d.\n\n", n_sources);
 
 	dt_max = mic_separation/c;
 	N_max = dt_max*sample_rate;
@@ -274,11 +336,26 @@ int main (int argc, char *argv[]) {
 
 	// initialization of internal buffers
 	// - overlap-add buffers
-	X_late	= (jack_default_audio_sample_t **) calloc(n_in_channels, sizeof(jack_default_audio_sample_t*));
-	X_early	= (jack_default_audio_sample_t **) calloc(n_in_channels, sizeof(jack_default_audio_sample_t*));
-	X_full	= (jack_default_audio_sample_t **) calloc(n_in_channels, sizeof(jack_default_audio_sample_t*));
-	X_gcc	= (std::complex<double> **) calloc(n_in_channels, sizeof(std::complex<double>*));
-	Aux_gcc	= (std::complex<double> *) calloc(window_size_2, sizeof(std::complex<double>));
+	X_late		= (jack_default_audio_sample_t **) calloc(n_in_channels, sizeof(jack_default_audio_sample_t*));
+	X_early		= (jack_default_audio_sample_t **) calloc(n_in_channels, sizeof(jack_default_audio_sample_t*));
+	X_full		= (jack_default_audio_sample_t **) calloc(n_in_channels, sizeof(jack_default_audio_sample_t*));
+	X_gcc		= (std::complex<double> **) calloc(n_in_channels, sizeof(std::complex<double>*));
+	Aux_gcc		= (std::complex<double> *) calloc(window_size_2, sizeof(std::complex<double>));
+	DOA_hist	= (double *) calloc(HISTLENGTH, sizeof(double));
+	DOA_kmean	= (double *) calloc(n_sources, sizeof(double));
+	DOA_mean	= (double *) calloc(n_sources, sizeof(double));
+	DOA_stdev	= (double *) calloc(n_sources, sizeof(double));
+	counter		= (int *) calloc(n_sources, sizeof(int));
+
+	for (i = 0; i < n_sources; ++i)
+	{
+		DOA_kmean[i] = 360.0/n_sources*i + 360.0/2.0/n_sources;
+		if (DOA_kmean[i] > 180.0) {
+			DOA_kmean[i] -= 360.0;
+		}
+		DOA_stdev[i] = 360.0/2.0/n_sources;
+	}
+
 
     for (i = 0; i < n_in_channels; ++i) {
         X_late[i]	= (jack_default_audio_sample_t *) calloc(window_size, sizeof(jack_default_audio_sample_t));
