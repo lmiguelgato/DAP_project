@@ -159,9 +159,9 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	double max_val12, max_val23, max_val31;
 
 	// find maximum of the cross-correlations, and estimate DOA:
-	double theta[6] = {asin(  unwrap(  max(X_gcc[1], window_size_2, &max_val12), nframes, N_max  )/N_max  )*RAD2DEG,
-					   asin(  unwrap(  max(X_gcc[2], window_size_2, &max_val23), nframes, N_max  )/N_max  )*RAD2DEG,
-					   asin(  unwrap(  max(X_gcc[0], window_size_2, &max_val31), nframes, N_max  )/N_max  )*RAD2DEG,
+	double theta[6] = {asin(  unwrap(  max(X_gcc[1], window_size_2, N_max, &max_val12), nframes, N_max  )/N_max  )*RAD2DEG,
+					   asin(  unwrap(  max(X_gcc[2], window_size_2, N_max, &max_val23), nframes, N_max  )/N_max  )*RAD2DEG,
+					   asin(  unwrap(  max(X_gcc[0], window_size_2, N_max, &max_val31), nframes, N_max  )/N_max  )*RAD2DEG,
 					   0.0,
 					   0.0,
 					   0.0};
@@ -186,7 +186,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 			mean_doa = (mean_doa*(counter-1) + doa)/counter;
 			detected = true;
 		} else {
-			if (abs(doa-mean_doa)<2*std_doa)
+			if (abs(doa-mean_doa)<6*std_doa)
 			{
 				++counter;
 				mean_doa = (mean_doa*(counter-1) + doa)/counter;
@@ -194,8 +194,10 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 				std_doa =  sqrt( std_cum/counter );
 			}
 		}
-		
-		printf("*** DOA = %1.5f\t%1.5f\t%1.5f\n", doa, mean_doa, std_doa);	
+		if (DEBUG)
+			printf("*** DOA = %1.5f\t%1.5f\t%1.5f\n", doa, mean_doa, std_doa);	
+		else
+			printf("*** DOA = %1.5f\n", mean_doa);	
 	}
 
 	// perform overlap-add:
