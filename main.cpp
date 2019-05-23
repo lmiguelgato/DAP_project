@@ -38,10 +38,11 @@ using namespace std;
 
 #define RAD2DEG 57.295779513082323f		// useful to convert from radians to degrees
 #define GCC_STYLE 1						// 1: GCC, 2:GCC (frequency restrained), 3:GCC-PHAT, 4:GCC-PHAT (frequency restrained)
-#define GCC_TH 100.0f					// correlation threshold (to avoid false alarms)
-#define REDUNDANCY_TH 20.0f				// redundancy threshold (for DOA estimation)
-#define HISTLENGTH 20
-#define DEBUG false
+#define GCC_TH 120.0f					// correlation threshold (to avoid false alarms)
+#define REDUNDANCY_TH 15.0f				// redundancy threshold (for DOA estimation)
+#define HISTLENGTH 20   				// k-means algorithm's memory
+#define DYNAMIC_GCC_TH 0				// enable a dynamic GCC threshold
+#define DEBUG false						// verbose
 
 
 // JACK:
@@ -66,6 +67,7 @@ double mean_doa = 0.0;					// average direction of arrival
 double std_doa = 90.0;					// standard deviation of the direction of arrival
 double std_cum = 90.0;					// standard deviation of the direction of arrival (cummulative)
 int n_sources = 1; 						// number of sources to be detected
+double gcc_th = GCC_TH;					// default GCC threshold
 
 double f_min = 1000.0;					// minimum frequency of the desired signal [Hz]
 double f_max = 4000.0;					// maximum frequency of the desired signal [Hz]
@@ -91,7 +93,9 @@ double *DOA_kmean;						// store DOA mean for each source (kmeans algorithm)
 double *DOA_mean;						// store DOA mean for each source
 double *DOA_stdev;						// store DOA standard deviation for each source
 int    *counter;						// store number of detections for each source
+int    *dcounter;						// number of valid DOAs
 int    icounter = 0;					// number of detections
+int    ccounter = 0;					// number of cycles
 
 ofstream outputFile;
 
@@ -186,19 +190,59 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 
 	doa = angleRedundancy (theta, thetaRedundant, REDUNDANCY_TH);
 
+	double max_mean, max_max;
+
+	switch (DYNAMIC_GCC_TH) {
+		case 1:
+			max_mean = (max_val12 + max_val23 + max_val31)/3;
+
+			if (max_mean > 1.0) {
+				++ccounter;
+				gcc_th = (gcc_th*(ccounter-1) + max_mean)/ccounter;
+			}
+		break;
+
+		case 2:
+			max_max = 0.0;
+
+			if (max_val12 > max_max)
+				max_max = max_val12;
+			if (max_val23 > max_max)
+				max_max = max_val23;
+			if (max_val31 > max_max)
+				max_max = max_val31;
+
+			if (max_max > 1.0) {
+				++ccounter;
+				gcc_th = (gcc_th*(ccounter-1) + max_max)/ccounter;
+			}
+		break;
+
+		default:
+			break;
+	}
+
 	if (DEBUG)
 	{
 		printf("theta1 = [%1.5f, %1.5f];\ttheta2 = [%1.5f, %1.5f];\ttheta3 = [%1.5f, %1.5f]\n", theta[0], theta[3], theta[1], theta[4], theta[2], theta[5]);
 		printf("val1 = %1.5f;\tval2 = %1.5f;\tval3 = %1.5f\n", max_val12, max_val23, max_val31);
+		printf("*gcc_th = %1.5f\n", gcc_th);
 		printf("thetaR = [%1.5f, %1.5f, %1.5f]\n", thetaRedundant[0], thetaRedundant[1], thetaRedundant[2]);
 	}
-	
 
-	if (doa != 181.0 && max_val12 > GCC_TH && max_val23 > GCC_TH && max_val31 > GCC_TH) {
+	if (doa != 181.0 && max_val12 > 0.9*gcc_th && max_val23 > 0.9*gcc_th && max_val31 > 0.9*gcc_th) {
 		DOA_hist[icounter%HISTLENGTH] = doa;
 		++icounter;
 
 		if (icounter >= HISTLENGTH) {
+			/*for (i = 0; i < n_sources; ++i)
+			{
+				DOA_kmean[i] = 360.0/n_sources*i + 360.0/2.0/n_sources;
+				if (DOA_kmean[i] > 180.0) {
+					DOA_kmean[i] -= 360.0;
+				}
+			}*/
+			
 			kmeans (DOA_hist, DOA_kmean, counter, n_sources, HISTLENGTH);
 
 			/*for (i = 0; i < n_sources; ++i)
@@ -219,6 +263,27 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 					std_doa =  sqrt( std_cum/icounter );
 				}
 			}*/
+
+			for (i = 0; i < n_sources; ++i)
+			{
+				if (counter[i] > 0) {	
+					++dcounter[i];
+					DOA_mean[i] = (DOA_mean[i]*(dcounter[i]-1) + DOA_kmean[i])/dcounter[i];
+					DOA_stdev[i] += pow(DOA_kmean[i]-DOA_mean[i], 2);
+
+					if (abs(DOA_kmean[i]-DOA_mean[i]) < sqrt(DOA_stdev[i]/dcounter[i])) {
+						printf("*** DOA[%d] = %1.5f\n", i, DOA_mean[i]);	
+						outputFile << DOA_mean[i] << endl;
+					}
+				} /*else
+				{
+					DOA_kmean[i] = 360.0/n_sources*i + 360.0/2.0/n_sources;
+					if (DOA_kmean[i] > 180.0) {
+						DOA_kmean[i] -= 360.0;
+					}
+				}*/
+			}
+			printf("\n");	
 		}
 
 
@@ -254,14 +319,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 			}
 		}*/
 		//if (DEBUG) {
-			for (i = 0; i < n_sources; ++i)
-			{
-				if (counter[i] > 0) {
-					printf("*** DOA[%d] = %1.5f\n", i, DOA_kmean[i]);	
-					outputFile << DOA_kmean[i] << endl;
-				}
-			}
-			printf("\n");	
+			
 		//}
 		//else
 		//	printf("*** DOA = %1.5f\n", mean_doa);	
@@ -294,7 +352,7 @@ int main (int argc, char *argv[]) {
 	int i;
 
 	if(argc != 3){		
-		printf ("Usage:\ndap_project d N\nd: Microphone separation (in meters).\nN: Number of sources.\n");
+		printf ("Usage:\ndap_project d N\nd: Microphone separation (in meters).\nN: Maximum number of sources.\n");
 		exit(1);
 	}
 
@@ -357,6 +415,7 @@ int main (int argc, char *argv[]) {
 	DOA_mean	= (double *) calloc(n_sources, sizeof(double));
 	DOA_stdev	= (double *) calloc(n_sources, sizeof(double));
 	counter		= (int *) calloc(n_sources, sizeof(int));
+	dcounter	= (int *) calloc(n_sources, sizeof(int));
 
 	for (i = 0; i < n_sources; ++i)
 	{
