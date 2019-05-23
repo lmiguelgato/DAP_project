@@ -17,6 +17,7 @@
 #include <iostream>
 #include <fstream>
 using namespace std;
+
 #include "tools/max.h"
 #include "tools/angleTranslation.h"
 #include "tools/unwrap.h"
@@ -41,7 +42,7 @@ using namespace std;
 #define GCC_TH 120.0f					// correlation threshold (to avoid false alarms)
 #define REDUNDANCY_TH 15.0f				// redundancy threshold (for DOA estimation)
 #define HISTLENGTH 20   				// k-means algorithm's memory
-#define DYNAMIC_GCC_TH 0				// enable a dynamic GCC threshold
+#define DYNAMIC_GCC_TH 0				// enable a dynamic GCC threshold (0: disabled, 1: mean peak values, 2: max peak values)
 #define DEBUG false						// verbose
 
 
@@ -97,7 +98,7 @@ int    *dcounter;						// number of valid DOAs
 int    icounter = 0;					// number of detections
 int    ccounter = 0;					// number of cycles
 
-ofstream outputFile;
+ofstream outputFile;					// save results for data analysis
 
 /**
  * The process callback for this JACK application is called in a
@@ -192,8 +193,8 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 
 	double max_mean, max_max;
 
-	switch (DYNAMIC_GCC_TH) {
-		case 1:
+	switch (DYNAMIC_GCC_TH) { //enable a dynamic GCC threshold
+		case 1:	// mean peak values
 			max_mean = (max_val12 + max_val23 + max_val31)/3;
 
 			if (max_mean > 1.0) {
@@ -202,7 +203,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 			}
 		break;
 
-		case 2:
+		case 2:	// max peak values
 			max_max = 0.0;
 
 			if (max_val12 > max_max)
@@ -230,102 +231,34 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		printf("thetaR = [%1.5f, %1.5f, %1.5f]\n", thetaRedundant[0], thetaRedundant[1], thetaRedundant[2]);
 	}
 
-	if (doa != 181.0 && max_val12 > 0.9*gcc_th && max_val23 > 0.9*gcc_th && max_val31 > 0.9*gcc_th) {
-		DOA_hist[icounter%HISTLENGTH] = doa;
+	if (doa != 181.0 && max_val12 > 0.9*gcc_th && max_val23 > 0.9*gcc_th && max_val31 > 0.9*gcc_th) { 	// are these DOAs valid?
+		DOA_hist[icounter%HISTLENGTH] = doa; 	// save into shift register
 		++icounter;
 
-		if (icounter >= HISTLENGTH) {
-			/*for (i = 0; i < n_sources; ++i)
-			{
-				DOA_kmean[i] = 360.0/n_sources*i + 360.0/2.0/n_sources;
-				if (DOA_kmean[i] > 180.0) {
-					DOA_kmean[i] -= 360.0;
-				}
-			}*/
-			
+		if (icounter >= HISTLENGTH) {	// is the shift register full?
+
+			// group similar DOAs into clusters using the k-means algorithm:
 			kmeans (DOA_hist, DOA_kmean, counter, n_sources, HISTLENGTH);
-
-			/*for (i = 0; i < n_sources; ++i)
-			{
-				
-			}
-
-			if (icounter == HISTLENGTH) {
-				++icounter;
-				mean_doa = (mean_doa*(counter-1) + doa)/icounter;
-				detected = true;
-			} else {
-				if (abs(doa-mean_doa)<6*std_doa)
-				{
-					++icounter;
-					mean_doa = (mean_doa*(counter-1) + doa)/icounter;
-					std_cum += pow(doa-mean_doa, 2);
-					std_doa =  sqrt( std_cum/icounter );
-				}
-			}*/
 
 			for (i = 0; i < n_sources; ++i)
 			{
-				if (counter[i] > 0) {	
+				if (counter[i] > 0) {	// any DOA in this cluster?
 					++dcounter[i];
-					DOA_mean[i] = (DOA_mean[i]*(dcounter[i]-1) + DOA_kmean[i])/dcounter[i];
-					DOA_stdev[i] += pow(DOA_kmean[i]-DOA_mean[i], 2);
 
-					if (abs(DOA_kmean[i]-DOA_mean[i]) < sqrt(DOA_stdev[i]/dcounter[i])) {
+					DOA_mean[i] = (DOA_mean[i]*(dcounter[i]-1) + DOA_kmean[i])/dcounter[i];		// moving average
+					DOA_stdev[i] += pow(DOA_kmean[i]-DOA_mean[i], 2);							// standard deviation
+
+					if (abs(DOA_kmean[i]-DOA_mean[i]) < sqrt(DOA_stdev[i]/dcounter[i])) {		// avoid outsiders
 						printf("*** DOA[%d] = %1.5f\n", i, DOA_mean[i]);	
-						outputFile << DOA_mean[i] << endl;
+						outputFile << DOA_mean[i] << endl;					// save results into text file
 					}
-				} /*else
-				{
-					DOA_kmean[i] = 360.0/n_sources*i + 360.0/2.0/n_sources;
-					if (DOA_kmean[i] > 180.0) {
-						DOA_kmean[i] -= 360.0;
-					}
-				}*/
+				}
 			}
 			printf("\n");	
 		}
-
-
-
-
-		/*for (i = 0; i < n_sources; ++i)
-		{
-			if (counter[i] == 0) {
-				++counter[i];
-				DOA_mean[i] = (DOA_mean[i]*counter[i] + doa)/(counter[i]+1);
-			} else {
-				if (abs(doa - DOA_mean[i])<3*sqrt( DOA_stdev[i]/counter[i] ))
-				{
-					++counter[i];
-					DOA_mean[i] = (DOA_mean[i]*counter[i] + doa)/(counter[i]+1);
-					DOA_stdev[i] += pow(doa - DOA_mean[i], 2);
-				}
-			}
-		}*/
-
-
-		/*if (!detected) {
-			++counter;
-			mean_doa = (mean_doa*(counter-1) + doa)/counter;
-			detected = true;
-		} else {
-			if (abs(doa-mean_doa)<6*std_doa)
-			{
-				++counter;
-				mean_doa = (mean_doa*(counter-1) + doa)/counter;
-				std_cum += pow(doa-mean_doa, 2);
-				std_doa =  sqrt( std_cum/counter );
-			}
-		}*/
-		//if (DEBUG) {
-			
-		//}
-		//else
-		//	printf("*** DOA = %1.5f\n", mean_doa);	
 	}
 
-	// perform overlap-add:
+	// audio output:
 	for (k = 0; k < n_out_channels; ++k) {
 		for (i = 0; i < nframes; ++i) {
 			out[k][i] = 0;			
@@ -419,10 +352,11 @@ int main (int argc, char *argv[]) {
 
 	for (i = 0; i < n_sources; ++i)
 	{
-		DOA_kmean[i] = 360.0/n_sources*i;// + 360.0/2.0/n_sources;
+		DOA_kmean[i] = 360.0/n_sources*i;// + 360.0/2.0/n_sources;	// "optimal" initialization for the k-means algorithm
 		if (DOA_kmean[i] > 180.0) {
 			DOA_kmean[i] -= 360.0;
 		}
+		//DOA_kmean[i] = distribution(generator);	// random initialization for the k-means algorithm
 		DOA_stdev[i] = 360.0/2.0/n_sources;
 	}
 
@@ -521,22 +455,6 @@ int main (int argc, char *argv[]) {
 	}
 	// free serverports_names variable, we're not going to use it again
 	free (serverports_names);
-
-	/*serverports_names = jack_get_ports (client, NULL, NULL, JackPortIsPhysical|JackPortIsOutput);
-	if (serverports_names == NULL) {
-		printf("No available physical capture (server output) ports.\n");
-		exit (1);
-	}
-	// Connect the first available to our input port
-	for(i = 0; i<n_in_channels; ++i) {
-		// Connect the first available to our output port
-		if (jack_connect (client, serverports_names[i], jack_port_name (input_ports[i]))) {
-			printf ("Cannot connect output port number %d.\n", i);
-			exit (1);
-		}
-	}
-	// free serverports_names variable for reuse in next part of the code
-	free (serverports_names);	*/
 	
 	printf ("done.\n\n");
 	/* keep running until stopped by the user */
