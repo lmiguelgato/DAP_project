@@ -419,7 +419,7 @@ int main (int argc, char *argv[]) {
 
 	for (i = 0; i < n_sources; ++i)
 	{
-		DOA_kmean[i] = 360.0/n_sources*i + 360.0/2.0/n_sources;
+		DOA_kmean[i] = 360.0/n_sources*i;// + 360.0/2.0/n_sources;
 		if (DOA_kmean[i] > 180.0) {
 			DOA_kmean[i] -= 360.0;
 		}
