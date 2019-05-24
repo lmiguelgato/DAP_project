@@ -32,6 +32,7 @@ using namespace std;
 // FFTW: library for computing the discrete Fourier transform of arbitrary input size, 
 //       and of both real and complex data.
 #include <complex.h> 	// needs to be included before fftw3.h for compatibility
+#include <cmath>
 #include <fftw3.h>
 
 // Eigen: C++ template library for linear algebra: matrices, vectors, numerical solvers, and related algorithms.
@@ -43,6 +44,7 @@ using namespace std;
 #define REDUNDANCY_TH 15.0f				// redundancy threshold (for DOA estimation)
 #define HISTLENGTH 20   				// k-means algorithm's memory
 #define DYNAMIC_GCC_TH 0				// enable a dynamic GCC threshold (0: disabled, 1: mean peak values, 2: max peak values)
+#define MOVING_AVERAGE 1				// enable a moving average on kmeans centroids
 #define DEBUG false						// verbose
 
 
@@ -55,11 +57,13 @@ jack_client_t *client;
 std::complex<double> *i_fft_4N, *i_time_4N, *o_fft_4N, *o_time_4N;
 std::complex<double> *i_fft_2N, *i_time_2N, *o_fft_2N, *o_time_2N;
 fftw_plan i_forward_4N, o_inverse_4N, i_forward_2N, o_inverse_2N;
+std::complex<double> ig(0.0, 1.0); 
+std::complex<double> wg(0.0, 0.0); 
 
 // default parameters:
 double sample_rate  = 48000.0;			// default sample rate [Hz]
 int nframes 		= 1024;				// default number of frames per jack buffer
-int window_size, window_size_2;			// fft size (window_size must be four times nframes)
+int window_size, window_size_2, nframes_2;	
 double mic_separation = 0.1;			// default microphone separation [meters]
 double c = 343.364;						// default sound speed [m/s]
 double dt_max, N_max;					// maximum delay between microphones [s, samples]
@@ -67,8 +71,10 @@ double doa;								// direction of arrival
 double mean_doa = 0.0;					// average direction of arrival
 double std_doa = 90.0;					// standard deviation of the direction of arrival
 double std_cum = 90.0;					// standard deviation of the direction of arrival (cummulative)
-int n_sources = 1; 						// number of sources to be detected
+int n_sources = 1; 						// default number of sources to be detected
+int source2filter = 0;					// default source to filter
 double gcc_th = GCC_TH;					// default GCC threshold
+double fRes; 							// frequency resolution
 
 double f_min = 1000.0;					// minimum frequency of the desired signal [Hz]
 double f_max = 4000.0;					// maximum frequency of the desired signal [Hz]
@@ -93,8 +99,10 @@ double *DOA_hist;						// store DOA history
 double *DOA_kmean;						// store DOA mean for each source (kmeans algorithm)
 double *DOA_mean;						// store DOA mean for each source
 double *DOA_stdev;						// store DOA standard deviation for each source
+double *DOA_valid;						// store valid DOAs
 int    *counter;						// store number of detections for each source
 int    *dcounter;						// number of valid DOAs
+int    *ecounter;						// number of smoothed valid DOAs
 int    icounter = 0;					// number of detections
 int    ccounter = 0;					// number of cycles
 
@@ -249,8 +257,14 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 					DOA_stdev[i] += pow(DOA_kmean[i]-DOA_mean[i], 2);							// standard deviation
 
 					if (abs(DOA_kmean[i]-DOA_mean[i]) < sqrt(DOA_stdev[i]/dcounter[i])) {		// avoid outsiders
-						printf("*** DOA[%d] = %1.5f\n", i, DOA_mean[i]);	
-						outputFile << DOA_mean[i] << endl;					// save results into text file
+						++ecounter[i];
+						if (MOVING_AVERAGE == 0) 
+							DOA_valid[i] = DOA_kmean[i];
+						else
+							DOA_valid[i] = DOA_mean[i];
+
+							printf("*** DOA[%d] = %1.5f\n", i, DOA_valid[i]);	
+							outputFile << DOA_valid[i] << endl;					// save results into text file
 					}
 				}
 			}
@@ -258,15 +272,89 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		}
 	}
 
-	// audio output:
-	for (k = 0; k < n_out_channels; ++k) {
+	if (ecounter[source2filter-1] > 0 && source2filter != 0) 	// if at least one valid DOA was found of the target source, apply beamforming
+	{
+		/*int delay[3] = {(int) (mic_separation*sin(doa/RAD2DEG)/c*sample_rate), 
+						(int) (mic_separation*sin((doa+120.0)/RAD2DEG)/c*sample_rate),
+						(int) (mic_separation*sin((doa-120.0)/RAD2DEG)/c*sample_rate)};
+		printf("\n\n------> doa = %1.5f (delay = %d, %d, %d)\n", doa, delay[0], delay[1], delay[2]);*/
+		int delay[2] = {(int) (mic_separation*sin(DOA_valid[source2filter-1]/RAD2DEG)/c*sample_rate), 
+						(int) (mic_separation*sin((120.0-DOA_valid[source2filter-1])/RAD2DEG)/c*sample_rate)};
+		printf("\n\n------> doa = %1.5f (delay = %d, %d)\n", DOA_valid[source2filter-1], delay[0], delay[1]);
+
+		//----  BEAMFORMING:
+
+		std::complex<double> tmpCplx(0.0, 0.0);
+
+		for (k = 1; k < n_in_channels; ++k)
+		{
+			// ---------------------------- 1st window ------------------------------------------
+
+			// FFT of the 1st window:
+			for(i = 0; i < window_size; i++){
+				i_time_4N[i] = X_full[k][i]*hann[i];
+			}
+			fftw_execute(i_forward_4N);
+			
+			// delay the 1st window in frequency domain:
+			for(i = 0; i < window_size; i++){
+				o_fft_4N[i] = i_fft_4N[i]*exp(ig*fRes*((double) i*delay[k-1]));
+			}
+			
+			// i-FFT of the 1st window:
+			fftw_execute(o_inverse_4N);
+			for(i = 0; i < window_size; i++){
+				X_late[k][i] = real(o_time_4N[i])/window_size; //fftw3 requires normalizing its output
+			}
+
+			// ---------------------------- 2nd window ------------------------------------------
+
+			// FFT of the 2nd window:
+			for(i = 0; i < window_size; i++){
+				i_time_4N[i] = X_full[k][window_size_2+i]*hann[i];
+			}
+			fftw_execute(i_forward_4N);
+			
+			// delay the 2nd window in frequency domain:
+			for(i = 0; i < window_size; i++){
+				o_fft_4N[i] = i_fft_4N[i]*exp(ig*fRes*((double) i*delay[k-1]));
+			}
+			
+			// i-FFT of the 2nd window:
+			fftw_execute(o_inverse_4N);
+			for(i = 0; i < window_size; i++){
+				X_early[k][i] = real(o_time_4N[i])/window_size; //fftw3 requires normalizing its output
+			}
+		}
+
+		// perform overlap-add:
+		
 		for (i = 0; i < nframes; ++i) {
-			out[k][i] = 0;			
-			for (j = 0; j < n_in_channels; ++j)
-				out[k][i] += in[j][i];
+			out[0][i] = X_full[0][i+window_size_2+nframes_2];
+			for (k = 1; k < n_in_channels; ++k)
+			{
+				out[0][i] += X_late[k][i+window_size_2+nframes_2] + X_early[k][i+nframes_2];
+			}
+			out[0][i] /= 3.0;
+			out[1][i] = 0.0;
+		}
+		
+	}
+	else {
+		// audio output:
+		/*for (k = 0; k < n_out_channels; ++k) {
+			for (i = 0; i < nframes; ++i) {
+				out[k][i] = 0;			
+				for (j = 0; j < n_in_channels; ++j)
+					out[k][i] += in[j][i];
+			}
+		}*/
+
+		for (i = 0; i < nframes; ++i) {
+			out[0][i] = X_full[0][i+window_size_2+nframes_2];
+			out[1][i] = 0.0;	
 		}
 	}
-	
 	return 0;
 }
 
@@ -284,15 +372,28 @@ int main (int argc, char *argv[]) {
 
 	int i;
 
-	if(argc != 3){		
-		printf ("Usage:\ndap_project d N\nd: Microphone separation (in meters).\nN: Maximum number of sources.\n");
+	if(argc != 4 && argc != 3){		
+		printf ("Usage:\ndap_project d N k\nd: Microphone separation (in meters).\nN: Maximum number of sources.\nk: Which source to filter.\n");
 		exit(1);
 	}
 
 	mic_separation = atof(argv[1]);
 	printf("\nMicrophone separation: %1.4f meters.", mic_separation);	
 	n_sources = atoi(argv[2]);
-	printf("\nExpected number of sources: %d.\n\n", n_sources);
+	printf("\nMaximum number of sources: %d.\n\n", n_sources);
+
+	if (argc == 4)
+	{
+		source2filter = atoi(argv[3]);
+
+		if (source2filter > n_sources || source2filter < 1) {
+			printf("The source to be filtered is not between 1 and the maximum number of sources provided. Quitting ...\n\n");
+			exit(1);
+		}
+
+		printf("\nSource number %d is going to be filtered.\n\n", source2filter);
+
+	}	
 
 	char fileName[30];
 	sprintf(fileName, "debug_%ddata.txt", n_sources);
@@ -331,10 +432,13 @@ int main (int argc, char *argv[]) {
 
 	// obtain here the delay from user and store it in 'delay' 
 	nframes 	= (int) jack_get_buffer_size (client);
+	nframes_2   = nframes/2;
 	window_size = 4*nframes;
 	window_size_2 = 2*nframes;
 	kmin = (int) (f_min/sample_rate*window_size_2);
 	kmax = (int) (f_max/sample_rate*window_size_2);
+
+	fRes = -2.0*M_PI/window_size;
 
 	// initialization of internal buffers
 	// - overlap-add buffers
@@ -347,8 +451,10 @@ int main (int argc, char *argv[]) {
 	DOA_kmean	= (double *) calloc(n_sources, sizeof(double));
 	DOA_mean	= (double *) calloc(n_sources, sizeof(double));
 	DOA_stdev	= (double *) calloc(n_sources, sizeof(double));
+	DOA_valid	= (double *) calloc(n_sources, sizeof(double));
 	counter		= (int *) calloc(n_sources, sizeof(int));
 	dcounter	= (int *) calloc(n_sources, sizeof(int));
+	ecounter	= (int *) calloc(n_sources, sizeof(int));
 
 	for (i = 0; i < n_sources; ++i)
 	{
