@@ -38,6 +38,10 @@ using namespace std;
 // Eigen: C++ template library for linear algebra: matrices, vectors, numerical solvers, and related algorithms.
 #include <Eigen/Eigen>
 
+// Libsndfile: library designed to allow the reading and writing of many different sampled sound file formats
+//             through one standard library interface.
+#include <sndfile.h>
+
 #define RAD2DEG 57.295779513082323f		// useful to convert from radians to degrees
 #define GCC_STYLE 1						// 1: GCC, 2:GCC (frequency restrained), 3:GCC-PHAT, 4:GCC-PHAT (frequency restrained)
 #define GCC_TH 120.0f					// correlation threshold (to avoid false alarms)
@@ -53,6 +57,12 @@ using namespace std;
 jack_port_t **input_ports;
 jack_port_t **output_ports;
 jack_client_t *client;
+
+// Libsndfile:
+SNDFILE * audio_file;
+SF_INFO audio_info;
+unsigned int audio_position = 0;
+float *write_buffer;
 
 // FFTW:
 std::complex<double> *i_fft_4N, *i_time_4N, *o_fft_4N, *o_time_4N;
@@ -281,11 +291,11 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	{
 		int delay[2] = {(int) (mic_separation*sin(DOA_valid[source2filter-1]/RAD2DEG)/c*sample_rate), 
 						(int) (mic_separation*sin((120.0-DOA_valid[source2filter-1])/RAD2DEG)/c*sample_rate)};
-		printf("\n\n------> doa = %1.5f (delay = %d, %d)\n", DOA_valid[source2filter-1], delay[0], delay[1]);
+		printf("\n\n------> doa = %1.5f\n", DOA_valid[source2filter-1]);
 
 		//----  BEAMFORMING:
 
-		std::complex<double> tmpCplx(0.0, 0.0);
+		int write_count;
 
 		for (k = 1; k < n_in_channels; ++k)
 		{
@@ -327,9 +337,10 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 				X_early[k][i] = real(o_time_4N[i])/window_size; //fftw3 requires normalizing its output
 			}
 		}
-
-		// perform overlap-add:
 		
+
+
+		// perform overlap-add:		
 		for (i = 0; i < nframes; ++i) {
 			out[0][i] = X_full[0][i+window_size_2+nframes_2];
 			for (k = 1; k < n_in_channels; ++k)
@@ -338,6 +349,20 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 			}
 			out[0][i] /= 3.0;
 			out[1][i] = 0.0;
+
+			write_buffer[i] = out[0][i];
+		}
+
+		write_count = sf_write_float(audio_file,write_buffer,nframes);
+
+		audio_position += write_count;
+
+		//Check for writing error
+		if(write_count != nframes){
+			printf("\nEncountered I/O error. Exiting.\n");
+			sf_close(audio_file);
+			jack_client_close (client);
+			exit (1);
 		}
 		
 	}
@@ -384,8 +409,10 @@ int main (int argc, char *argv[]) {
 		}
 
 		printf("\nSource number %d is going to be filtered.\n\n", source2filter);
+	}
 
-	}	
+	char audio_file_path[30];
+	sprintf(audio_file_path, "audio_%d_(%d).wav", n_sources, source2filter);
 
 	char fileName[30];
 	sprintf(fileName, "debug_%ddata.txt", n_sources);
@@ -451,6 +478,7 @@ int main (int argc, char *argv[]) {
 	counter		= (int *) calloc(n_sources, sizeof(int));
 	dcounter	= (int *) calloc(n_sources, sizeof(int));
 	ecounter	= (int *) calloc(n_sources, sizeof(int));
+	write_buffer = (float *) calloc(nframes, sizeof(float));
 
 	for (i = 0; i < n_sources; ++i)
 	{
@@ -520,6 +548,21 @@ int main (int argc, char *argv[]) {
 			exit (1);
 		}
 	}	
+
+	printf("Trying to open audio File: %s\n",audio_file_path);
+	audio_info.samplerate = sample_rate;
+	audio_info.channels = 1;
+	audio_info.format = SF_FORMAT_WAV | SF_FORMAT_PCM_32;
+
+	audio_file = sf_open (audio_file_path,SFM_WRITE,&audio_info);
+	if(audio_file == NULL){
+		printf("%s\n",sf_strerror(NULL));
+		exit(1);
+	}else{
+		printf("Audio file info:\n");
+		printf("\tSample Rate: %d\n",audio_info.samplerate);
+		printf("\tChannels: %d\n",audio_info.channels);
+	}
 	
 	/* Tell the JACK server that we are ready to roll.
 	   Our jack_callback() callback will start running now. */
@@ -568,6 +611,7 @@ int main (int argc, char *argv[]) {
 	   they would be important to call.
 	*/
 	jack_client_close (client);
+	sf_close(audio_file);
 	outputFile.close();
 	tabbedFile.close();
 	exit (0);
