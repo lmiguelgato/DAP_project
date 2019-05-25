@@ -42,9 +42,10 @@ using namespace std;
 #define GCC_STYLE 1						// 1: GCC, 2:GCC (frequency restrained), 3:GCC-PHAT, 4:GCC-PHAT (frequency restrained)
 #define GCC_TH 120.0f					// correlation threshold (to avoid false alarms)
 #define REDUNDANCY_TH 15.0f				// redundancy threshold (for DOA estimation)
-#define HISTLENGTH 20   				// k-means algorithm's memory
-#define DYNAMIC_GCC_TH 0				// enable a dynamic GCC threshold (0: disabled, 1: mean peak values, 2: max peak values)
+#define DYNAMIC_GCC_TH 1				// enable a dynamic GCC threshold (0: disabled, 1: mean peak values, 2: max peak values)
 #define MOVING_AVERAGE 1				// enable a moving average on kmeans centroids
+#define MOVING_FACTOR 1					// allow variations in DOA if the sources are moving
+#define MEMORY_FACTOR 5					// memory of the k-means algorithm
 #define DEBUG false						// verbose
 
 
@@ -57,8 +58,7 @@ jack_client_t *client;
 std::complex<double> *i_fft_4N, *i_time_4N, *o_fft_4N, *o_time_4N;
 std::complex<double> *i_fft_2N, *i_time_2N, *o_fft_2N, *o_time_2N;
 fftw_plan i_forward_4N, o_inverse_4N, i_forward_2N, o_inverse_2N;
-std::complex<double> ig(0.0, 1.0); 
-std::complex<double> wg(0.0, 0.0); 
+std::complex<double> ig(0.0, 1.0); 		// imaginary unit
 
 // default parameters:
 double sample_rate  = 48000.0;			// default sample rate [Hz]
@@ -105,8 +105,10 @@ int    *dcounter;						// number of valid DOAs
 int    *ecounter;						// number of smoothed valid DOAs
 int    icounter = 0;					// number of detections
 int    ccounter = 0;					// number of cycles
+int    hist_length;						// number of cycles
 
 ofstream outputFile;					// save results for data analysis
+ofstream tabbedFile;					// save results for data analysis
 
 /**
  * The process callback for this JACK application is called in a
@@ -240,13 +242,13 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	}
 
 	if (doa != 181.0 && max_val12 > 0.9*gcc_th && max_val23 > 0.9*gcc_th && max_val31 > 0.9*gcc_th) { 	// are these DOAs valid?
-		DOA_hist[icounter%HISTLENGTH] = doa; 	// save into shift register
+		DOA_hist[icounter%hist_length] = doa; 	// save into shift register
 		++icounter;
 
-		if (icounter >= HISTLENGTH) {	// is the shift register full?
+		if (icounter >= hist_length) {	// is the shift register full?
 
 			// group similar DOAs into clusters using the k-means algorithm:
-			kmeans (DOA_hist, DOA_kmean, counter, n_sources, HISTLENGTH);
+			kmeans (DOA_hist, DOA_kmean, counter, n_sources, hist_length);
 
 			for (i = 0; i < n_sources; ++i)
 			{
@@ -256,28 +258,27 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 					DOA_mean[i] = (DOA_mean[i]*(dcounter[i]-1) + DOA_kmean[i])/dcounter[i];		// moving average
 					DOA_stdev[i] += pow(DOA_kmean[i]-DOA_mean[i], 2);							// standard deviation
 
-					if (abs(DOA_kmean[i]-DOA_mean[i]) < sqrt(DOA_stdev[i]/dcounter[i])) {		// avoid outsiders
+					if (abs(DOA_kmean[i]-DOA_mean[i]) < MOVING_FACTOR*sqrt(DOA_stdev[i]/dcounter[i])) {		// avoid outsiders
 						++ecounter[i];
 						if (MOVING_AVERAGE == 0) 
 							DOA_valid[i] = DOA_kmean[i];
 						else
 							DOA_valid[i] = DOA_mean[i];
 
-							printf("*** DOA[%d] = %1.5f\n", i, DOA_valid[i]);	
-							outputFile << DOA_valid[i] << endl;					// save results into text file
+							printf("*** DOA[%d] = %1.4f\n", i, DOA_valid[i]);	
+							outputFile << DOA_valid[i];					// save results into text file
+							tabbedFile << DOA_valid[i];					// save results into text file
 					}
 				}
+				tabbedFile << ", ";
 			}
+			tabbedFile << endl;
 			printf("\n");	
 		}
 	}
 
 	if (ecounter[source2filter-1] > 0 && source2filter != 0) 	// if at least one valid DOA was found of the target source, apply beamforming
 	{
-		/*int delay[3] = {(int) (mic_separation*sin(doa/RAD2DEG)/c*sample_rate), 
-						(int) (mic_separation*sin((doa+120.0)/RAD2DEG)/c*sample_rate),
-						(int) (mic_separation*sin((doa-120.0)/RAD2DEG)/c*sample_rate)};
-		printf("\n\n------> doa = %1.5f (delay = %d, %d, %d)\n", doa, delay[0], delay[1], delay[2]);*/
 		int delay[2] = {(int) (mic_separation*sin(DOA_valid[source2filter-1]/RAD2DEG)/c*sample_rate), 
 						(int) (mic_separation*sin((120.0-DOA_valid[source2filter-1])/RAD2DEG)/c*sample_rate)};
 		printf("\n\n------> doa = %1.5f (delay = %d, %d)\n", DOA_valid[source2filter-1], delay[0], delay[1]);
@@ -341,15 +342,6 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		
 	}
 	else {
-		// audio output:
-		/*for (k = 0; k < n_out_channels; ++k) {
-			for (i = 0; i < nframes; ++i) {
-				out[k][i] = 0;			
-				for (j = 0; j < n_in_channels; ++j)
-					out[k][i] += in[j][i];
-			}
-		}*/
-
 		for (i = 0; i < nframes; ++i) {
 			out[0][i] = X_full[0][i+window_size_2+nframes_2];
 			out[1][i] = 0.0;	
@@ -398,6 +390,8 @@ int main (int argc, char *argv[]) {
 	char fileName[30];
 	sprintf(fileName, "debug_%ddata.txt", n_sources);
 	outputFile.open(fileName);
+	sprintf(fileName, "tabbed%ddata.txt", n_sources);
+	tabbedFile.open(fileName);
 
 	dt_max = mic_separation/c;
 	N_max = dt_max*sample_rate;
@@ -440,6 +434,8 @@ int main (int argc, char *argv[]) {
 
 	fRes = 2.0*M_PI/window_size;
 
+	hist_length = MEMORY_FACTOR*n_sources;
+
 	// initialization of internal buffers
 	// - overlap-add buffers
 	X_late		= (jack_default_audio_sample_t **) calloc(n_in_channels, sizeof(jack_default_audio_sample_t*));
@@ -447,7 +443,7 @@ int main (int argc, char *argv[]) {
 	X_full		= (jack_default_audio_sample_t **) calloc(n_in_channels, sizeof(jack_default_audio_sample_t*));
 	X_gcc		= (std::complex<double> **) calloc(n_in_channels, sizeof(std::complex<double>*));
 	Aux_gcc		= (std::complex<double> *) calloc(window_size_2, sizeof(std::complex<double>));
-	DOA_hist	= (double *) calloc(HISTLENGTH, sizeof(double));
+	DOA_hist	= (double *) calloc(hist_length, sizeof(double));
 	DOA_kmean	= (double *) calloc(n_sources, sizeof(double));
 	DOA_mean	= (double *) calloc(n_sources, sizeof(double));
 	DOA_stdev	= (double *) calloc(n_sources, sizeof(double));
@@ -573,5 +569,6 @@ int main (int argc, char *argv[]) {
 	*/
 	jack_client_close (client);
 	outputFile.close();
+	tabbedFile.close();
 	exit (0);
 }
