@@ -438,7 +438,7 @@ int main (int argc, char *argv[]) {
 	kmin = (int) (f_min/sample_rate*window_size_2);
 	kmax = (int) (f_max/sample_rate*window_size_2);
 
-	fRes = -2.0*M_PI/window_size;
+	fRes = 2.0*M_PI/window_size;
 
 	// initialization of internal buffers
 	// - overlap-add buffers
