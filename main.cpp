@@ -59,9 +59,9 @@ jack_port_t **output_ports;
 jack_client_t *client;
 
 // Libsndfile:
-SNDFILE * audio_file;
+SNDFILE * saudio_file;
+SNDFILE ** audio_file;
 SF_INFO audio_info;
-unsigned int audio_position = 0;
 float *write_buffer;
 
 // FFTW:
@@ -287,89 +287,180 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		}
 	}
 
-	if (ecounter[source2filter-1] > 0 && source2filter != 0) 	// if at least one valid DOA was found of the target source, apply beamforming
-	{
-		int delay[2] = {(int) (mic_separation*sin(DOA_valid[source2filter-1]/RAD2DEG)/c*sample_rate), 
-						(int) (mic_separation*sin((120.0-DOA_valid[source2filter-1])/RAD2DEG)/c*sample_rate)};
-		printf("\n\n------> doa = %1.5f\n", DOA_valid[source2filter-1]);
-
-		//----  BEAMFORMING:
-
-		int write_count;
-
-		for (k = 1; k < n_in_channels; ++k)
-		{
-			// ---------------------------- 1st window ------------------------------------------
-
-			// FFT of the 1st window:
-			for(i = 0; i < window_size; i++){
-				i_time_4N[i] = X_full[k][i]*hann[i];
-			}
-			fftw_execute(i_forward_4N);
-			
-			// delay the 1st window in frequency domain:
-			for(i = 0; i < window_size; i++){
-				o_fft_4N[i] = i_fft_4N[i]*exp(ig*fRes*((double) i*delay[k-1]));
-			}
-			
-			// i-FFT of the 1st window:
-			fftw_execute(o_inverse_4N);
-			for(i = 0; i < window_size; i++){
-				X_late[k][i] = real(o_time_4N[i])/window_size; //fftw3 requires normalizing its output
-			}
-
-			// ---------------------------- 2nd window ------------------------------------------
-
-			// FFT of the 2nd window:
-			for(i = 0; i < window_size; i++){
-				i_time_4N[i] = X_full[k][window_size_2+i]*hann[i];
-			}
-			fftw_execute(i_forward_4N);
-			
-			// delay the 2nd window in frequency domain:
-			for(i = 0; i < window_size; i++){
-				o_fft_4N[i] = i_fft_4N[i]*exp(ig*fRes*((double) i*delay[k-1]));
-			}
-			
-			// i-FFT of the 2nd window:
-			fftw_execute(o_inverse_4N);
-			for(i = 0; i < window_size; i++){
-				X_early[k][i] = real(o_time_4N[i])/window_size; //fftw3 requires normalizing its output
-			}
-		}
-		
-
-
-		// perform overlap-add:		
-		for (i = 0; i < nframes; ++i) {
-			out[0][i] = X_full[0][i+window_size_2+nframes_2];
-			for (k = 1; k < n_in_channels; ++k)
+	if (source2filter != 0) {
+		if (source2filter != -1) {
+			if (ecounter[source2filter-1] > 0) 	// if at least one valid DOA was found of the target source, apply beamforming
 			{
-				out[0][i] += X_late[k][i+window_size_2+nframes_2] + X_early[k][i+nframes_2];
+				int delay[2] = {(int) (mic_separation*sin(DOA_valid[source2filter-1]/RAD2DEG)/c*sample_rate), 
+								(int) (mic_separation*sin((120.0-DOA_valid[source2filter-1])/RAD2DEG)/c*sample_rate)};
+				printf("\n\n------> doa = %1.5f\n", DOA_valid[source2filter-1]);
+
+				//----  BEAMFORMING:
+
+				int write_count;
+
+				for (k = 1; k < n_in_channels; ++k)
+				{
+					// ---------------------------- 1st window ------------------------------------------
+
+					// FFT of the 1st window:
+					for(i = 0; i < window_size; i++){
+						i_time_4N[i] = X_full[k][i]*hann[i];
+					}
+					fftw_execute(i_forward_4N);
+					
+					// delay the 1st window in frequency domain:
+					for(i = 0; i < window_size; i++){
+						o_fft_4N[i] = i_fft_4N[i]*exp(ig*fRes*((double) i*delay[k-1]));
+					}
+					
+					// i-FFT of the 1st window:
+					fftw_execute(o_inverse_4N);
+					for(i = 0; i < window_size; i++){
+						X_late[k][i] = real(o_time_4N[i])/window_size; //fftw3 requires normalizing its output
+					}
+
+					// ---------------------------- 2nd window ------------------------------------------
+
+					// FFT of the 2nd window:
+					for(i = 0; i < window_size; i++){
+						i_time_4N[i] = X_full[k][window_size_2+i]*hann[i];
+					}
+					fftw_execute(i_forward_4N);
+					
+					// delay the 2nd window in frequency domain:
+					for(i = 0; i < window_size; i++){
+						o_fft_4N[i] = i_fft_4N[i]*exp(ig*fRes*((double) i*delay[k-1]));
+					}
+					
+					// i-FFT of the 2nd window:
+					fftw_execute(o_inverse_4N);
+					for(i = 0; i < window_size; i++){
+						X_early[k][i] = real(o_time_4N[i])/window_size; //fftw3 requires normalizing its output
+					}
+				}
+				
+
+
+				// perform overlap-add:		
+				for (i = 0; i < nframes; ++i) {
+					out[0][i] = X_full[0][i+window_size_2+nframes_2];
+					for (k = 1; k < n_in_channels; ++k)
+					{
+						out[0][i] += X_late[k][i+window_size_2+nframes_2] + X_early[k][i+nframes_2];
+					}
+					out[0][i] /= 3.0;
+					out[1][i] = 0.0;
+
+					write_buffer[i] = out[0][i];
+				}
+
+				write_count = sf_write_float(saudio_file,write_buffer,nframes);
+
+				//Check for writing error
+				if(write_count != nframes){
+					printf("\nEncountered I/O error. Exiting.\n");
+					sf_close(saudio_file);
+					jack_client_close (client);
+					exit (1);
+				}
+				
 			}
-			out[0][i] /= 3.0;
-			out[1][i] = 0.0;
-
-			write_buffer[i] = out[0][i];
+		} else {
+			// filter none
+			for (i = 0; i < nframes; ++i) {
+				out[0][i] = X_full[0][i+window_size_2+nframes_2];
+				out[1][i] = 0.0;	
+			}
 		}
 
-		write_count = sf_write_float(audio_file,write_buffer,nframes);
+	} else {
+		// filter all
+		int write_count;
+		int delay[2];
+		for (int s2f = 1; s2f <= n_sources; ++s2f)
+		{
+			if (ecounter[s2f-1] > 0) 	// if at least one valid DOA was found of the target source, apply beamforming
+			{
+				delay[0] = (int) (mic_separation*sin(DOA_valid[s2f-1]/RAD2DEG)/c*sample_rate);
+				delay[1] = (int) (mic_separation*sin((120.0-DOA_valid[s2f-1])/RAD2DEG)/c*sample_rate);
 
-		audio_position += write_count;
+				for (k = 1; k < n_in_channels; ++k)
+				{
+					// ---------------------------- 1st window ------------------------------------------
 
-		//Check for writing error
-		if(write_count != nframes){
-			printf("\nEncountered I/O error. Exiting.\n");
-			sf_close(audio_file);
-			jack_client_close (client);
-			exit (1);
-		}
-		
-	}
-	else {
-		for (i = 0; i < nframes; ++i) {
-			out[0][i] = X_full[0][i+window_size_2+nframes_2];
-			out[1][i] = 0.0;	
+					// FFT of the 1st window:
+					for(i = 0; i < window_size; i++){
+						i_time_4N[i] = X_full[k][i]*hann[i];
+					}
+					fftw_execute(i_forward_4N);
+					
+					// delay the 1st window in frequency domain:
+					for(i = 0; i < window_size; i++){
+						o_fft_4N[i] = i_fft_4N[i]*exp(ig*fRes*((double) i*delay[k-1]));
+					}
+					
+					// i-FFT of the 1st window:
+					fftw_execute(o_inverse_4N);
+					for(i = 0; i < window_size; i++){
+						X_late[k][i] = real(o_time_4N[i])/window_size; //fftw3 requires normalizing its output
+					}
+
+					// ---------------------------- 2nd window ------------------------------------------
+
+					// FFT of the 2nd window:
+					for(i = 0; i < window_size; i++){
+						i_time_4N[i] = X_full[k][window_size_2+i]*hann[i];
+					}
+					fftw_execute(i_forward_4N);
+					
+					// delay the 2nd window in frequency domain:
+					for(i = 0; i < window_size; i++){
+						o_fft_4N[i] = i_fft_4N[i]*exp(ig*fRes*((double) i*delay[k-1]));
+					}
+					
+					// i-FFT of the 2nd window:
+					fftw_execute(o_inverse_4N);
+					for(i = 0; i < window_size; i++){
+						X_early[k][i] = real(o_time_4N[i])/window_size; //fftw3 requires normalizing its output
+					}
+
+					// perform overlap-add:		
+					for (i = 0; i < nframes; ++i) {
+						write_buffer[i] = X_full[0][i+window_size_2+nframes_2];;
+						for (k = 1; k < n_in_channels; ++k)
+						{
+							write_buffer[i] += X_late[k][i+window_size_2+nframes_2] + X_early[k][i+nframes_2];
+						}
+						write_buffer[i] /= 3.0;
+					}
+
+					write_count = sf_write_float(audio_file[s2f-1],write_buffer,nframes);
+
+					//Check for writing error
+					if(write_count != nframes){
+						printf("\nEncountered I/O error. Exiting.\n");
+						sf_close(audio_file[s2f-1]);
+						jack_client_close (client);
+						exit (1);
+					}
+				}
+			} else {
+				for (i = 0; i < nframes; ++i) {
+					write_buffer[i] = X_full[0][i+window_size_2+nframes_2];
+				}
+				write_count = sf_write_float(audio_file[s2f-1],write_buffer,nframes);
+
+					//Check for writing error
+					if(write_count != nframes){
+						printf("\nEncountered I/O error. Exiting.\n");
+						sf_close(audio_file[s2f-1]);
+						jack_client_close (client);
+						exit (1);
+					}
+			}
+
+			
 		}
 	}
 	return 0;
@@ -403,7 +494,7 @@ int main (int argc, char *argv[]) {
 	{
 		source2filter = atoi(argv[3]);
 
-		if (source2filter > n_sources || source2filter < 1) {
+		if (source2filter > n_sources || source2filter < -1) {
 			printf("The source to be filtered is not between 1 and the maximum number of sources provided. Quitting ...\n\n");
 			exit(1);
 		}
@@ -549,19 +640,44 @@ int main (int argc, char *argv[]) {
 		}
 	}	
 
-	printf("Trying to open audio File: %s\n",audio_file_path);
-	audio_info.samplerate = sample_rate;
-	audio_info.channels = 1;
-	audio_info.format = SF_FORMAT_WAV | SF_FORMAT_PCM_32;
+	audio_file = (SNDFILE **) calloc(n_sources, sizeof(SNDFILE*));
 
-	audio_file = sf_open (audio_file_path,SFM_WRITE,&audio_info);
-	if(audio_file == NULL){
-		printf("%s\n",sf_strerror(NULL));
-		exit(1);
-	}else{
-		printf("Audio file info:\n");
-		printf("\tSample Rate: %d\n",audio_info.samplerate);
-		printf("\tChannels: %d\n",audio_info.channels);
+	if (source2filter == 0) {
+		for (i = 0; i < n_sources; ++i)
+		{
+			printf("Trying to open audio File: audio_%d_(%d).wav",n_sources,i+1);
+			audio_info.samplerate = sample_rate;
+			audio_info.channels = 1;
+			audio_info.format = SF_FORMAT_WAV | SF_FORMAT_PCM_32;
+			sprintf(audio_file_path, "audio_%d_(%d).wav", n_sources, i+1);
+			audio_file[i] = sf_open (audio_file_path,SFM_WRITE,&audio_info);
+			if(audio_file[i] == NULL){
+				printf("%s\n",sf_strerror(NULL));
+				exit(1);
+			}else{
+				printf("Audio file info:\n");
+				printf("\tSample Rate: %d\n",audio_info.samplerate);
+				printf("\tChannels: %d\n",audio_info.channels);
+			}
+		}	
+	} else {
+		if (source2filter != -1)
+		{
+			printf("Trying to open audio File: %s\n",audio_file_path);
+			audio_info.samplerate = sample_rate;
+			audio_info.channels = 1;
+			audio_info.format = SF_FORMAT_WAV | SF_FORMAT_PCM_32;
+
+			saudio_file = sf_open (audio_file_path,SFM_WRITE,&audio_info);
+			if(saudio_file == NULL){
+				printf("%s\n",sf_strerror(NULL));
+				exit(1);
+			}else{
+				printf("Audio file info:\n");
+				printf("\tSample Rate: %d\n",audio_info.samplerate);
+				printf("\tChannels: %d\n",audio_info.channels);
+			}
+		}
 	}
 	
 	/* Tell the JACK server that we are ready to roll.
@@ -611,7 +727,7 @@ int main (int argc, char *argv[]) {
 	   they would be important to call.
 	*/
 	jack_client_close (client);
-	sf_close(audio_file);
+	//sf_close(audio_file);
 	outputFile.close();
 	tabbedFile.close();
 	exit (0);
