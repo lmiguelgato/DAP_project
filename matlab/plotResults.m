@@ -1,5 +1,7 @@
 close all
 
+addpath('../output')
+
 A = textread('tabbed4data.txt', '', 'delimiter', ',', ... 
                 'emptyvalue', NaN);
 

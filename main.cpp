@@ -159,7 +159,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		// cross-correlation in four steps:
 		// 1- zero padding:
 		for (i = 0; i < nframes; ++i)
-			i_time_2N[i] = X_full[j][i];
+			i_time_2N[i] = in[j][i];
 
 		for (i = nframes; i < window_size_2; ++i)
 			i_time_2N[i] = 0.0;
@@ -287,17 +287,19 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		}
 	}
 
+	int write_count;
+	int delay[2];
+
 	if (source2filter != 0) {
 		if (source2filter != -1) {
 			if (ecounter[source2filter-1] > 0) 	// if at least one valid DOA was found of the target source, apply beamforming
 			{
-				int delay[2] = {(int) (mic_separation*sin(DOA_valid[source2filter-1]/RAD2DEG)/c*sample_rate), 
-								(int) (mic_separation*sin((120.0-DOA_valid[source2filter-1])/RAD2DEG)/c*sample_rate)};
+				delay[0] = (int) (mic_separation*sin(DOA_valid[source2filter-1]/RAD2DEG)/c*sample_rate);
+				delay[1] = (int) (mic_separation*sin((120.0-DOA_valid[source2filter-1])/RAD2DEG)/c*sample_rate);
+
 				printf("\n\n------> doa = %1.5f\n", DOA_valid[source2filter-1]);
 
 				//----  BEAMFORMING:
-
-				int write_count;
 
 				for (k = 1; k < n_in_channels; ++k)
 				{
@@ -365,6 +367,30 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 					exit (1);
 				}
 				
+			} else {	// don't start writing if no audio is being played
+				max_max = 0.0;
+
+				if (max_val12 > max_max)
+					max_max = max_val12;
+				if (max_val23 > max_max)
+					max_max = max_val23;
+				if (max_val31 > max_max)
+					max_max = max_val31;
+
+				if (max_max > 0.001) {
+					for (i = 0; i < nframes; ++i) {
+						write_buffer[i] = X_full[0][i+window_size_2+nframes_2];
+					}
+					write_count = sf_write_float(saudio_file,write_buffer,nframes);
+
+					//Check for writing error
+					if(write_count != nframes){
+						printf("\nEncountered I/O error. Exiting.\n");
+						sf_close(saudio_file);
+						jack_client_close (client);
+						exit (1);
+					}
+				}
 			}
 		} else {
 			// filter none
@@ -376,8 +402,6 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 
 	} else {
 		// filter all
-		int write_count;
-		int delay[2];
 		for (int s2f = 1; s2f <= n_sources; ++s2f)
 		{
 			if (ecounter[s2f-1] > 0) 	// if at least one valid DOA was found of the target source, apply beamforming
@@ -445,11 +469,21 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 						exit (1);
 					}
 				}
-			} else {
-				for (i = 0; i < nframes; ++i) {
-					write_buffer[i] = X_full[0][i+window_size_2+nframes_2];
-				}
-				write_count = sf_write_float(audio_file[s2f-1],write_buffer,nframes);
+			} else {	// don't start writing if no audio is being played
+				max_max = 0.0;
+
+				if (max_val12 > max_max)
+					max_max = max_val12;
+				if (max_val23 > max_max)
+					max_max = max_val23;
+				if (max_val31 > max_max)
+					max_max = max_val31;
+
+				if (max_max > 0.001) {
+					for (i = 0; i < nframes; ++i) {
+						write_buffer[i] = X_full[0][i+window_size_2+nframes_2];
+					}
+					write_count = sf_write_float(audio_file[s2f-1],write_buffer,nframes);
 
 					//Check for writing error
 					if(write_count != nframes){
@@ -458,9 +492,8 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 						jack_client_close (client);
 						exit (1);
 					}
-			}
-
-			
+				}
+			}			
 		}
 	}
 	return 0;
@@ -502,13 +535,14 @@ int main (int argc, char *argv[]) {
 		printf("\nSource number %d is going to be filtered.\n\n", source2filter);
 	}
 
-	char audio_file_path[30];
-	sprintf(audio_file_path, "audio_%d_(%d).wav", n_sources, source2filter);
+	system("mkdir -p output");
+	char audio_file_path[40];
+	sprintf(audio_file_path, "output/audio_%d_(%d).wav", n_sources, source2filter);
 
 	char fileName[30];
-	sprintf(fileName, "debug_%ddata.txt", n_sources);
+	sprintf(fileName, "output/debug_%ddata.txt", n_sources);
 	outputFile.open(fileName);
-	sprintf(fileName, "tabbed%ddata.txt", n_sources);
+	sprintf(fileName, "output/tabbed%ddata.txt", n_sources);
 	tabbedFile.open(fileName);
 
 	dt_max = mic_separation/c;
@@ -649,7 +683,7 @@ int main (int argc, char *argv[]) {
 			audio_info.samplerate = sample_rate;
 			audio_info.channels = 1;
 			audio_info.format = SF_FORMAT_WAV | SF_FORMAT_PCM_32;
-			sprintf(audio_file_path, "audio_%d_(%d).wav", n_sources, i+1);
+			sprintf(audio_file_path, "output/audio_%d_(%d).wav", n_sources, i+1);
 			audio_file[i] = sf_open (audio_file_path,SFM_WRITE,&audio_info);
 			if(audio_file[i] == NULL){
 				printf("%s\n",sf_strerror(NULL));
