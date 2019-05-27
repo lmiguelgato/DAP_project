@@ -4,7 +4,8 @@ clc
 
 addpath('./tools')
 addpath('./tools/bss_eval')
-addpath('./corpus/corpus48000/clean-4source')
+addpath('../output')
+addpath('../corpus/corpus48000/clean-4source')
 
 k = 1;
 

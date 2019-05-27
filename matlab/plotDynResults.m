@@ -8,7 +8,7 @@ N = 2;
 
 A = textread(['tabbed' num2str(N) 'data.txt'], '', 'delimiter', ',', ... 
                 'emptyvalue', NaN);
-            
+
 createfigure(A)
 axis([1 size(A,1) -184 184])
 
