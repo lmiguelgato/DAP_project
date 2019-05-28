@@ -1,0 +1,211 @@
+INpath = '../corpus/corpus48000/clean-2source/';
+
+1,1 
+Input Signal to Interference Ratio:  -4.2104 dB				SIR de pristine 1 antes de BF
+Output Signal to Interference Ratio: -3.1557 dB				SIR de pristine 1 luego de BF (segun audio 1)		
+Improvement in Signal to Interference Ratio: 1.0547 dB
+1,2
+Input Signal to Interference Ratio:  4.0365 dB				SIR de pristine 2 antes de BF
+Output Signal to Interference Ratio: 2.9281 dB				SIR de pristine 2 luego de BF (segun audio 1) 		*
+Improvement in Signal to Interference Ratio: -1.1084 dB
+2,1
+Input Signal to Interference Ratio:  -4.2104 dB				SIR de pristine 1 antes de BF
+Output Signal to Interference Ratio: -2.0626 dB				SIR de pristine 1 luego de BF (segun audio 2)		*
+Improvement in Signal to Interference Ratio: 2.1478 dB
+2,2
+Input Signal to Interference Ratio:  4.0365 dB				SIR de pristine 2 antes de BF
+Output Signal to Interference Ratio: 1.9751 dB				SIR de pristine 2 luego de BF (segun audio 2)
+Improvement in Signal to Interference Ratio: -2.0614 dB
+
+-------------------------------------------------------
+
+INpath = '../corpus/corpus48000/clean-2source090/';
+
+1, 1
+Input Signal to Interference Ratio:  -2.7008 dB
+Output Signal to Interference Ratio: -2.8734 dB
+Improvement in Signal to Interference Ratio: -0.1726 dB			*
+1, 2
+Input Signal to Interference Ratio:  2.8779 dB
+Output Signal to Interference Ratio: 3.0536 dB
+Improvement in Signal to Interference Ratio: 0.17574 dB
+2, 1
+Input Signal to Interference Ratio:  -2.7008 dB
+Output Signal to Interference Ratio: -5.8347 dB
+Improvement in Signal to Interference Ratio: -3.1339 dB
+2, 2
+Input Signal to Interference Ratio:  2.8779 dB
+Output Signal to Interference Ratio: 5.9875 dB
+Improvement in Signal to Interference Ratio: 3.1097 dB			*
+
+-------------------------------------------------------
+
+INpath = '../corpus/corpus48000/clean-2source090_2/';
+
+1, 1
+Input Signal to Interference Ratio:  3.6927 dB
+Output Signal to Interference Ratio: 5.0305 dB
+Improvement in Signal to Interference Ratio: 1.3379 dB			*
+1, 2
+Input Signal to Interference Ratio:  -3.7007 dB
+Output Signal to Interference Ratio: -5.2391 dB
+Improvement in Signal to Interference Ratio: -1.5384 dB
+2, 1
+Input Signal to Interference Ratio:  3.6927 dB
+Output Signal to Interference Ratio: 2.6341 dB
+Improvement in Signal to Interference Ratio: -1.0585 dB
+2, 2
+Input Signal to Interference Ratio:  -3.7007 dB
+Output Signal to Interference Ratio: -2.7954 dB
+Improvement in Signal to Interference Ratio: 0.90527 dB			*
+
+-------------------------------------------------------
+
+INpath = '../corpus/corpus48000/clean-3source/';
+
+1,1
+Input Signal to Interference Ratio:  -3.0547 dB
+Output Signal to Interference Ratio: -12.5162 dB
+Improvement in Signal to Interference Ratio: -9.4615 dB		*
+1,2
+Input Signal to Interference Ratio:  -8.1168 dB
+Output Signal to Interference Ratio: -4.9554 dB
+Improvement in Signal to Interference Ratio: 3.1614 dB
+1,3
+Input Signal to Interference Ratio:  0.72078 dB
+Output Signal to Interference Ratio: 3.719 dB
+Improvement in Signal to Interference Ratio: 2.9982 dB				*
+2,1
+Input Signal to Interference Ratio:  -3.0547 dB
+Output Signal to Interference Ratio: -12.8316 dB
+Improvement in Signal to Interference Ratio: -9.7769 dB
+2,2
+Input Signal to Interference Ratio:  -8.1168 dB
+Output Signal to Interference Ratio: -4.8465 dB
+Improvement in Signal to Interference Ratio: 3.2703 dB		*
+2,3
+Input Signal to Interference Ratio:  0.72078 dB
+Output Signal to Interference Ratio: 3.6849 dB
+Improvement in Signal to Interference Ratio: 2.9641 dB
+3,1
+Input Signal to Interference Ratio:  -3.0547 dB
+Output Signal to Interference Ratio: -9.8806 dB
+Improvement in Signal to Interference Ratio: -6.8259 dB				*
+3,2
+Input Signal to Interference Ratio:  -8.1168 dB
+Output Signal to Interference Ratio: -4.6013 dB
+Improvement in Signal to Interference Ratio: 3.5155 dB				*
+3,3
+Input Signal to Interference Ratio:  0.72078 dB
+Output Signal to Interference Ratio: 2.8398 dB
+Improvement in Signal to Interference Ratio: 2.119 dB		*
+
+-------------------------------------------------------
+
+INpath = '../corpus/corpus48000/clean-3source090180/';
+
+1, 1
+Input Signal to Interference Ratio:  0.63022 dB				*
+Output Signal to Interference Ratio: 2.3474 dB
+Improvement in Signal to Interference Ratio: 1.7171 dB
+1, 2
+Input Signal to Interference Ratio:  -19.1603 dB
+Output Signal to Interference Ratio: -14.2372 dB
+Improvement in Signal to Interference Ratio: 4.9231 dB
+1, 3
+Input Signal to Interference Ratio:  -0.8192 dB
+Output Signal to Interference Ratio: -2.9664 dB
+Improvement in Signal to Interference Ratio: -2.1472 dB
+2, 1
+Input Signal to Interference Ratio:  0.63022 dB
+Output Signal to Interference Ratio: 1.9249 dB
+Improvement in Signal to Interference Ratio: 1.2946 dB
+2, 2
+Input Signal to Interference Ratio:  -19.1603 dB
+Output Signal to Interference Ratio: -12.6421 dB
+Improvement in Signal to Interference Ratio: 6.5182 dB		*
+2, 3
+Input Signal to Interference Ratio:  -0.8192 dB
+Output Signal to Interference Ratio: -2.7011 dB
+Improvement in Signal to Interference Ratio: -1.8819 dB
+3, 1
+Input Signal to Interference Ratio:  0.63022 dB
+Output Signal to Interference Ratio: 2.4041 dB
+Improvement in Signal to Interference Ratio: 1.7738 dB
+3, 2
+Input Signal to Interference Ratio:  -19.1603 dB
+Output Signal to Interference Ratio: -14.281 dB
+Improvement in Signal to Interference Ratio: 4.8793 dB
+3, 3
+Input Signal to Interference Ratio:  -0.8192 dB
+Output Signal to Interference Ratio: -3.0122 dB
+Improvement in Signal to Interference Ratio: -2.193 dB		*
+
+-------------------------------------------------------
+
+INpath = '../corpus/corpus48000/clean-4source/';
+
+1, 1
+Input Signal to Interference Ratio:  -14.9513 dB
+Output Signal to Interference Ratio: -14.3708 dB
+Improvement in Signal to Interference Ratio: 0.58047 dB		*
+1, 2
+Input Signal to Interference Ratio:  -10.0105 dB
+Output Signal to Interference Ratio: -9.0644 dB
+Improvement in Signal to Interference Ratio: 0.9461 dB
+1, 3
+Input Signal to Interference Ratio:  -20.4378 dB
+Output Signal to Interference Ratio: -19.107 dB
+Improvement in Signal to Interference Ratio: 1.3309 dB		
+1, 4
+Input Signal to Interference Ratio:  8.839 dB
+Output Signal to Interference Ratio: 7.3764 dB
+Improvement in Signal to Interference Ratio: -1.4626 dB
+2, 1
+Input Signal to Interference Ratio:  -14.9513 dB
+Output Signal to Interference Ratio: -14.4479 dB
+Improvement in Signal to Interference Ratio: 0.50335 dB
+2, 2
+Input Signal to Interference Ratio:  -10.0105 dB
+Output Signal to Interference Ratio: -7.6601 dB
+Improvement in Signal to Interference Ratio: 2.3504 dB		*
+2, 3
+Input Signal to Interference Ratio:  -20.4378 dB
+Output Signal to Interference Ratio: -18.1339 dB
+Improvement in Signal to Interference Ratio: 2.304 dB
+2, 4
+Input Signal to Interference Ratio:  8.839 dB
+Output Signal to Interference Ratio: 6.2936 dB
+Improvement in Signal to Interference Ratio: -2.5454 dB
+3, 1
+Input Signal to Interference Ratio:  -14.9513 dB
+Output Signal to Interference Ratio: -15.0886 dB
+Improvement in Signal to Interference Ratio: -0.13735 dB
+3, 2
+Input Signal to Interference Ratio:  -10.0105 dB
+Output Signal to Interference Ratio: -10.9143 dB
+Improvement in Signal to Interference Ratio: -0.90375 dB
+3, 3
+Input Signal to Interference Ratio:  -20.4378 dB
+Output Signal to Interference Ratio: -20.3379 dB
+Improvement in Signal to Interference Ratio: 0.099985 dB	*
+3, 4
+Input Signal to Interference Ratio:  8.839 dB
+Output Signal to Interference Ratio: 8.9562 dB
+Improvement in Signal to Interference Ratio: 0.11716 dB
+4, 1
+Input Signal to Interference Ratio:  -14.9513 dB
+Output Signal to Interference Ratio: -16.4454 dB
+Improvement in Signal to Interference Ratio: -1.4941 dB
+4, 2
+Input Signal to Interference Ratio:  -10.0105 dB
+Output Signal to Interference Ratio: -14.3353 dB
+Improvement in Signal to Interference Ratio: -4.3248 dB
+4, 3
+Input Signal to Interference Ratio:  -20.4378 dB
+Output Signal to Interference Ratio: -21.1806 dB
+Improvement in Signal to Interference Ratio: -0.74278 dB
+4, 4
+Input Signal to Interference Ratio:  8.839 dB
+Output Signal to Interference Ratio: 11.6728 dB
+Improvement in Signal to Interference Ratio: 2.8338 dB			*

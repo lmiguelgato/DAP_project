@@ -4,57 +4,89 @@ clc
 
 addpath('./tools')
 addpath('./tools/bss_eval')
-addpath('../output')
-addpath('../corpus/corpus48000/clean-4source')
 
-k = 1;
+N = 3;
 
-[s1, fs] = audioread('pristine_channel1.wav');
-[s2, ~] = audioread('pristine_channel2.wav');
-[s3, ~] = audioread('pristine_channel3.wav');
-[s4, ~] = audioread('pristine_channel4.wav');
+INpath = ['../corpus/corpus48000/clean-' num2str(N) 'source090180/'];
+OUTpath = '../output/';
 
-[y, ~] = audioread('audio_4_(2).wav');
+fs = 48e3;
 
-N = min([length(s1), length(s2), length(s3), length(s4), length(y)]);
-N = floor(N/1024)*1024;
+T = 20;
 
-%% Evaluation of the separation algorithm:
-S = [s1(1:N)'; s2(1:N)'; s3(1:N)'; s4(1:N)'];
+L1 = 800000;
+L2 = 950000;
 
-[s_target, e_interf, e_artif] = bss_decomp_gain(y(1:N)', k, S);
+D = 0.050*fs;
+D1 = 0.010*fs;
 
-[SDR, SIR, SAR] = bss_crit(s_target, e_interf, e_artif);
+L = round(T*fs);
 
-[~, SIRi, ~] = bss_crit(S(k,:), sum(S,1)-S(k,:), zeros(1, N));
+[x, ~] = audioread([INpath 'wav_mic1.wav']);
 
-SIRd = SIR - SIRi;
+S = zeros(N, L-D);
+for i = 1:N
+    [s, ~] = audioread([INpath 'pristine_channel' num2str(i) '.wav']);
+    S(i, :) = s(1:L-D)';
+end
 
-disp(' ')
-disp(['Input Signal to Interference Ratio:  ' num2str(SIRi) ' dB'])
-disp(['Output Signal to Interference Ratio: ' num2str(SIR) ' dB'])
-disp(['Improvement in Signal to Interference Ratio: ' num2str(SIRd) ' dB'])
+for k1 = 1:N
+    [y, ~] = audioread([OUTpath 'audio_' num2str(N) '_(' num2str(k1) ').wav']);
+    y = y(D+1:L);
+    
+    for k2 = 1:N
 
-% Local evaluation:
-[SDR_local, SIR_local, SAR_local] = ...
-    bss_crit(s_target, e_interf, zeros(1, N), e_artif, hanning(2048)', 1024);
+    %% Evaluation of the separation algorithm:
+    [s_target, e_interf, e_artif] = bss_decomp_filt(y(L1:L2)', k2, S(:, L1:L2), D1);
 
-t       = (0:N-1)/fs;
+    [SDR, SIR, SAR] = bss_crit(s_target, e_interf, e_artif);
 
-figure('units','normalized','outerposition',[0 0 1 1])
-plot(t, s_target, 'LineWidth', 2)
-hold on;
-plot(t, e_interf, 'LineWidth', 2)
-legend('s_{target}', 'e_{interf}')
-xlabel 'Time (s)'
-title 'Signal decomposition'
+    [is_target, ie_interf, ie_artif] = bss_decomp_filt(x(L1:L2)', k2, S(:, L1:L2), D1);
 
-figure('units','normalized','outerposition',[0 0 1 1])
-plot(SIR_local, 'LineWidth', 2)
-legend('SIR(t)')
-title 'Performance vs. time'
+    [SDRi, SIRi, SARi] = bss_crit(is_target, ie_interf, ie_artif);
 
-% player = audioplayer(s_target*40, fs);
+    SIRd = SIR - SIRi;
+
+    disp([num2str(k1) ', ' num2str(k2)])
+    disp(['Input Signal to Interference Ratio:  ' num2str(SIRi) ' dB'])
+    disp(['Output Signal to Interference Ratio: ' num2str(SIR) ' dB'])
+    disp(['Improvement in Signal to Interference Ratio: ' num2str(SIRd) ' dB'])
+    end
+end
+
+%     % Local evaluation:
+%     [SDR_local, SIR_local, SAR_local] = ...
+%         bss_crit(s_target, e_interf, zeros(1, L2-L1+1), e_artif, hanning(2048)', 1024);
+%     % Local evaluation:
+%     [iSDR_local, iSIR_local, iSAR_local] = ...
+%         bss_crit(is_target, ie_interf, zeros(1, L2-L1+1), ie_artif, hanning(2048)', 1024);
+
+% t       = (0:L2-L1)/fs;
+% 
+% figure('units','normalized','outerposition',[0 0 1 1])
+% plot(t, s_target, 'LineWidth', 2)
+% hold on;
+% plot(t, e_interf, 'LineWidth', 2)
+% legend('s_{target}', 'e_{interf}')
+% xlabel 'Time (s)'
+% title 'Signal decomposition'
+% 
+% figure('units','normalized','outerposition',[0 0 1 1])
+% plot(t, is_target, 'LineWidth', 2)
+% hold on;
+% plot(t, ie_interf, 'LineWidth', 2)
+% legend('is_{target}', 'ie_{interf}')
+% xlabel 'Time (s)'
+% title 'Signal decomposition'
+% 
+% figure('units','normalized','outerposition',[0 0 1 1])
+% plot(SIR_local, 'LineWidth', 2)
+% hold on
+% plot(iSIR_local, 'LineWidth', 2)
+% legend('SIR(t)')
+% title 'Performance vs. time'
+
+% player = audioplayer(y*40, fs);
 % play(player)
 
 % player = audioplayer(y, fs);
