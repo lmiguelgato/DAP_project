@@ -93,6 +93,8 @@ int kmin, kmax;							// discrete minimum and maximum frequencies of the desired
 unsigned int n_out_channels = 2;		// number of output channels
 unsigned int n_in_channels = 3;			// number of input channels
 
+int state = 0;							// beamformer state
+
 jack_default_audio_sample_t *hann;		// array to store the Hann window
 
 // overlap-add registers:
@@ -342,29 +344,43 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 					}
 				}
 				
+				max_max = 0.0f;
 
+					if (max_val12 > max_max)
+						max_max = max_val12;
+					if (max_val23 > max_max)
+						max_max = max_val23;
+					if (max_val31 > max_max)
+						max_max = max_val31;
 
-				// perform overlap-add:		
-				for (i = 0; i < nframes; ++i) {
-					out[0][i] = X_full[0][i+window_size_2+nframes_2];
-					for (k = 1; k < n_in_channels; ++k)
-					{
-						out[0][i] += X_late[k][i+window_size_2+nframes_2] + X_early[k][i+nframes_2];
+					if (max_max == 0.0f) {
+						if(state == 1) exit(1);
 					}
-					out[0][i] /= 3.0;
-					out[1][i] = 0.0;
+					else {
+						if(state == 0) state = 1;
 
-					write_buffer[i] = out[0][i];
-				}
+						// perform overlap-add:		
+						for (i = 0; i < nframes; ++i) {
+							out[0][i] = X_full[0][i+window_size_2+nframes_2];
+							for (k = 1; k < n_in_channels; ++k)
+							{
+								out[0][i] += X_late[k][i+window_size_2+nframes_2] + X_early[k][i+nframes_2];
+							}
+							out[0][i] /= 3.0;
+							out[1][i] = 0.0;
 
-				write_count = sf_write_float(saudio_file,write_buffer,nframes);
+							write_buffer[i] = out[0][i];
+						}
 
-				//Check for writing error
-				if(write_count != nframes){
-					printf("\nEncountered I/O error. Exiting.\n");
-					sf_close(saudio_file);
-					jack_client_close (client);
-					exit (1);
+						write_count = sf_write_float(saudio_file,write_buffer,nframes);
+
+						//Check for writing error
+						if(write_count != nframes){
+							printf("\nEncountered I/O error. Exiting.\n");
+							sf_close(saudio_file);
+							jack_client_close (client);
+							exit (1);
+					}
 				}
 				
 			} else {	// don't start writing if no audio is being played
@@ -377,7 +393,11 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 				if (max_val31 > max_max)
 					max_max = max_val31;
 
-				if (max_max > 0.001) {
+				if (max_max == 0.0f) {
+					if(state == 1) exit(1);
+				} else {
+					if(state == 0) state = 1;
+
 					for (i = 0; i < nframes; ++i) {
 						write_buffer[i] = X_full[0][i+window_size_2+nframes_2];
 					}
@@ -393,10 +413,26 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 				}
 			}
 		} else {
-			// filter none
-			for (i = 0; i < nframes; ++i) {
-				out[0][i] = X_full[0][i+window_size_2+nframes_2];
-				out[1][i] = 0.0;	
+			max_max = 0.0f;
+
+			if (max_val12 > max_max)
+				max_max = max_val12;
+			if (max_val23 > max_max)
+				max_max = max_val23;
+			if (max_val31 > max_max)
+				max_max = max_val31;
+
+			if (max_max == 0.0f) {
+				if(state == 1) exit(1);
+			}
+			else {
+				if(state == 0) state = 1;
+
+				// filter none
+				for (i = 0; i < nframes; ++i) {
+					out[0][i] = X_full[0][i+window_size_2+nframes_2];
+					out[1][i] = 0.0;	
+				}
 			}
 		}
 
@@ -449,28 +485,44 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 						X_early[k][i] = real(o_time_4N[i])/window_size; //fftw3 requires normalizing its output
 					}
 
-					// perform overlap-add:		
-					for (i = 0; i < nframes; ++i) {
-						write_buffer[i] = X_full[0][i+window_size_2+nframes_2];;
-						for (k = 1; k < n_in_channels; ++k)
-						{
-							write_buffer[i] += X_late[k][i+window_size_2+nframes_2] + X_early[k][i+nframes_2];
-						}
-						write_buffer[i] /= 3.0;
+					max_max = 0.0f;
+
+					if (max_val12 > max_max)
+						max_max = max_val12;
+					if (max_val23 > max_max)
+						max_max = max_val23;
+					if (max_val31 > max_max)
+						max_max = max_val31;
+
+					if (max_max == 0.0f) {
+						if(state == 1) exit(1);
 					}
+					else {
+						if(state == 0) state = 1;
 
-					write_count = sf_write_float(audio_file[s2f-1],write_buffer,nframes);
+						// perform overlap-add:		
+						for (i = 0; i < nframes; ++i) {
+							write_buffer[i] = X_full[0][i+window_size_2+nframes_2];;
+							for (k = 1; k < n_in_channels; ++k)
+							{
+								write_buffer[i] += X_late[k][i+window_size_2+nframes_2] + X_early[k][i+nframes_2];
+							}
+							write_buffer[i] /= 3.0;
+						}
 
-					//Check for writing error
-					if(write_count != nframes){
-						printf("\nEncountered I/O error. Exiting.\n");
-						sf_close(audio_file[s2f-1]);
-						jack_client_close (client);
-						exit (1);
+						write_count = sf_write_float(audio_file[s2f-1],write_buffer,nframes);
+
+						//Check for writing error
+						if(write_count != nframes){
+							printf("\nEncountered I/O error. Exiting.\n");
+							sf_close(audio_file[s2f-1]);
+							jack_client_close (client);
+							exit (1);
+						}
 					}
 				}
 			} else {	// don't start writing if no audio is being played
-				max_max = 0.0;
+				max_max = 0.0f;
 
 				if (max_val12 > max_max)
 					max_max = max_val12;
@@ -479,7 +531,12 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 				if (max_val31 > max_max)
 					max_max = max_val31;
 
-				if (max_max > 0.001) {
+				if (max_max == 0.0f) {
+					if(state == 1) exit(1);
+				}
+				else {
+					if(state == 0) state = 1;
+
 					for (i = 0; i < nframes; ++i) {
 						write_buffer[i] = X_full[0][i+window_size_2+nframes_2];
 					}
@@ -532,7 +589,10 @@ int main (int argc, char *argv[]) {
 			exit(1);
 		}
 
-		printf("\nSource number %d is going to be filtered.\n\n", source2filter);
+		if (source2filter == 0)
+			printf("\nAll sources are going to be filtered.\n\n");
+		else
+			printf("\nSource number %d is going to be filtered.\n\n", source2filter);
 	}
 
 	system("mkdir -p output");
