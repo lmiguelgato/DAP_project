@@ -38,3 +38,7 @@ ReadMicWavs
 dap_project
 
 output/
+
+gcc_beamformer
+
+beamformer
