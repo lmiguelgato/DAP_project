@@ -42,3 +42,19 @@ output/
 gcc_beamformer
 
 beamformer
+
+*.snm
+
+*.gz
+
+*.toc
+
+doc/beamer/figures/vect/
+
+*.aux
+
+*.log
+
+*.nav
+
+doc/beamer/main_beamer\.pdf

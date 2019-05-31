@@ -1,7 +1,0 @@
-\babel@toc {spanish}{}
-\beamer@sectionintoc {1}{Descripci\IeC {\'o}n del problema}{3}{0}{1}
-\beamer@sectionintoc {2}{Modelo geom\IeC {\'e}trico de propagaci\IeC {\'o}n}{10}{0}{2}
-\beamer@sectionintoc {3}{Estimaci\IeC {\'o}n de las direcciones de arribo}{15}{0}{3}
-\beamer@sectionintoc {4}{Separaci\IeC {\'o}n de las fuentes de voz}{30}{0}{4}
-\beamer@sectionintoc {5}{Resultados}{34}{0}{5}
-\beamer@sectionintoc {6}{Conclusiones}{40}{0}{6}
