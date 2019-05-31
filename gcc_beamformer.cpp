@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <random>
 #include <iostream>
 #include <fstream>
 using namespace std;
@@ -43,15 +44,14 @@ using namespace std;
 #include <sndfile.h>
 
 #define RAD2DEG 57.295779513082323f		// useful to convert from radians to degrees
-#define GCC_STYLE 1						// 1: GCC, 2:GCC (frequency restrained), 3:GCC-PHAT, 4:GCC-PHAT (frequency restrained)
+#define GCC_STYLE 4						// 1: GCC, 2:GCC (frequency restrained), 3:GCC-PHAT, 4:GCC-PHAT (frequency restrained)
 #define GCC_TH 120.0f					// correlation threshold (to avoid false alarms)
-#define REDUNDANCY_TH 15.0f				// redundancy threshold (for DOA estimation)
+#define REDUNDANCY_TH 20.0f				// redundancy threshold (for DOA estimation)
 #define DYNAMIC_GCC_TH 1				// enable a dynamic GCC threshold (0: disabled, 1: mean peak values, 2: max peak values)
-#define MOVING_AVERAGE 1				// enable a moving average on kmeans centroids
+#define MOVING_AVERAGE 1				// enable a moving average on kmeans centroids (0: disabled, 1: finite memory, 2: infinite memory)
 #define MOVING_FACTOR 1					// allow variations in DOA if the sources are moving
-#define MEMORY_FACTOR 5					// memory of the k-means algorithm
-#define DEBUG false						// verbose
-
+#define MEMORY_FACTOR 20				// memory of the k-means algorithm
+#define DEBUG false		
 
 // JACK:
 jack_port_t **input_ports;
@@ -74,7 +74,7 @@ std::complex<double> ig(0.0, 1.0); 		// imaginary unit
 double sample_rate  = 48000.0;			// default sample rate [Hz]
 int nframes 		= 1024;				// default number of frames per jack buffer
 int window_size, window_size_2, nframes_2;	
-double mic_separation = 0.1;			// default microphone separation [meters]
+double mic_separation = 0.18;			// default microphone separation [meters]
 double c = 343.364;						// default sound speed [m/s]
 double dt_max, N_max;					// maximum delay between microphones [s, samples]
 double doa;								// direction of arrival
@@ -267,8 +267,13 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 				if (counter[i] > 0) {	// any DOA in this cluster?
 					++dcounter[i];
 
-					DOA_mean[i] = (DOA_mean[i]*(dcounter[i]-1) + DOA_kmean[i])/dcounter[i];		// moving average
-					DOA_stdev[i] += pow(DOA_kmean[i]-DOA_mean[i], 2);							// standard deviation
+					if (MOVING_AVERAGE == 2) { //enable moving average
+						DOA_mean[i] = (DOA_mean[i]*(dcounter[i]-1) + DOA_kmean[i])/dcounter[i];		// moving average
+						DOA_stdev[i] += pow(DOA_kmean[i]-DOA_mean[i], 2);							// standard deviation
+					} else {
+						DOA_mean[i] = (DOA_mean[i] + DOA_kmean[i])/2.0;		// moving average
+						DOA_stdev[i] += pow(DOA_kmean[i]-DOA_mean[i], 2);							// standard deviation
+					}
 
 					if (abs(DOA_kmean[i]-DOA_mean[i]) < MOVING_FACTOR*sqrt(DOA_stdev[i]/dcounter[i])) {		// avoid outsiders
 						++ecounter[i];
@@ -665,9 +670,13 @@ int main (int argc, char *argv[]) {
 	ecounter	= (int *) calloc(n_sources, sizeof(int));
 	write_buffer = (float *) calloc(nframes, sizeof(float));
 
+	std::default_random_engine generator;
+  	std::uniform_real_distribution<double> distribution(-180.0,180.0);
+
 	for (i = 0; i < n_sources; ++i)
 	{
-		DOA_kmean[i] = 360.0/n_sources*i;// + 360.0/2.0/n_sources;	// "optimal" initialization for the k-means algorithm
+		DOA_kmean[i] = 360.0/n_sources*i; //+ distribution(generator); 360.0/2.0/n_sources;	// "optimal" initialization for the k-means algorithm
+		//DOA_kmean[i] = distribution(generator);	// random initialization for the k-means algorithm
 		if (DOA_kmean[i] > 180.0) {
 			DOA_kmean[i] -= 360.0;
 		}
