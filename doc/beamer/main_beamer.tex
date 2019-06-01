@@ -312,31 +312,31 @@
 		\end{figure}
 	\end{frame}
 	
-	\begin{frame}{Estimación de las direcciones de arribo}
-		\textbf{Estas modificaciones permiten también extender el método a fuentes móviles:}
-		
-		\hspace{20mm}
-		\begin{minipage} {105mm}
-			\begin{figure}[h]
-				\centering
-				\includegraphics[width=\linewidth]{figures/moving1nomean}
-			\end{figure}
-		\end{minipage}\\
-		\hspace{130mm}\textbf{antes ...}
-	\end{frame}
-	
-	\begin{frame}{Estimación de las direcciones de arribo}
-		\textbf{Estas modificaciones permiten también extender el método a fuentes móviles:}
-		
-		\hspace{20mm}
-		\begin{minipage} {105mm}
-			\begin{figure}[h]
-				\centering
-				\includegraphics[width=0.98\linewidth]{figures/moving130kmean10degrees}
-			\end{figure}
-		\end{minipage}\\
-		\hspace{130mm}\textbf{... después.}
-	\end{frame}
+%	\begin{frame}{Estimación de las direcciones de arribo}
+%		\textbf{Estas modificaciones permiten también extender el método a fuentes móviles:}
+%		
+%		\hspace{20mm}
+%		\begin{minipage} {105mm}
+%			\begin{figure}[h]
+%				\centering
+%				\includegraphics[width=\linewidth]{figures/moving1nomean}
+%			\end{figure}
+%		\end{minipage}\\
+%		\hspace{130mm}\textbf{antes ...}
+%	\end{frame}
+%	
+%	\begin{frame}{Estimación de las direcciones de arribo}
+%		\textbf{Estas modificaciones permiten también extender el método a fuentes móviles:}
+%		
+%		\hspace{20mm}
+%		\begin{minipage} {105mm}
+%			\begin{figure}[h]
+%				\centering
+%				\includegraphics[width=0.98\linewidth]{figures/moving130kmean10degrees}
+%			\end{figure}
+%		\end{minipage}\\
+%		\hspace{130mm}\textbf{... después.}
+%	\end{frame}
 	
 	\section{Separación de las fuentes de voz}
 	
@@ -369,65 +369,112 @@
 	
 	\section{Resultados}
 	
+%	\begin{frame}{Resultados}
+%		\begin{minipage}{70mm}
+%			\textbf{Cámara anecoica: $\pmb{\theta} = [0, 90, 180]$}
+%			\begin{figure}[h]
+%				\centering
+%				\includegraphics[width=0.9\linewidth]{figures/3Clean.eps}
+%			\end{figure}
+%		\end{minipage}
+%		\begin{minipage}{70mm}
+%			\hspace{10mm}\textbf{Oficina: $\pmb{\theta} = [0, 90, 180]$}
+%			\begin{figure}[h]
+%				\centering
+%				\includegraphics[width=0.9\linewidth]{figures/3Noisy.eps}
+%			\end{figure}
+%		\end{minipage}
+%	\end{frame}
+	
 	\begin{frame}{Resultados}
-	Estimación de las direcciones de arribo de dos fuentes localizadas en $\pmb{\theta} = [5^{\mathrm{o}}~~8^{\mathrm{o}}]^T$.				
-		\begin{figure}[h]
-			\centering
-			\includegraphics[width=0.58\linewidth]{figures/Fig12.png}
-		\end{figure}
+		\begin{minipage}{70mm}
+			\textbf{Cámara anecoica: $\pmb{\theta} = [-90, 0, 90, 180]$}
+			\begin{figure}[h]
+				\centering
+				\includegraphics[width=0.9\linewidth]{figures/4Clean.eps}
+			\end{figure}
+		\end{minipage}
+		\begin{minipage}{70mm}
+			\hspace{10mm}\textbf{Oficina: $\pmb{\theta} = [-90, 0, 90, 180]$}
+			\begin{figure}[h]
+				\centering
+				\includegraphics[width=0.9\linewidth]{figures/4Noisy.eps}
+			\end{figure}
+		\end{minipage}
+	\end{frame}
+	
+	\begin{frame}{Resultados preliminares}
+		\textbf{Fuentes en movimiento:}
+		
+		\hspace{20mm}
+		\begin{minipage} {105mm}
+			\begin{figure}[h]
+				\centering
+				\includegraphics[width=\linewidth]{figures/moving1nomean}
+			\end{figure}
+		\end{minipage}\\
+		\hspace{130mm}\textbf{antes ...}
+	\end{frame}
+	
+	\begin{frame}{Resultados preliminares}
+		\textbf{Fuentes en movimiento:}
+		
+		\hspace{20mm}
+		\begin{minipage} {105mm}
+			\begin{figure}[h]
+				\centering
+				\includegraphics[width=0.99\linewidth]{figures/moving130kmean10degrees}
+			\end{figure}
+		\end{minipage}\\
+		\hspace{130mm}\textbf{... después.}
 	\end{frame}
 	
 	\begin{frame}{Resultados}
+		\textbf{Se usó la librería BSS\_EVAL\footnote{E. Vincent, R. Gribonval and C. Févotte, \textit{Performance measurement in blind audio source separation}, IEEE Trans. Audio, Speech and Language Processing, 14(4), pp 1462-1469, 2006.} para evaluar el desempeño del formador de haz, y estos son algunos ejemplos de resultados obtenidos:}
 		\begin{table}[H]
-			Error cuadrático medio de los estimadores.
-			\vspace{5mm}
 			\begin{center}
-				\begin{tabular}{|l|l||c|c|}
-					\hline  && $\theta = 5^{\mathrm{o}}$ & $\theta = 8^{\mathrm{o}}$ \\ 
-					\cline{3-4}
-					$\sigma^2$&SNR (dB)& $~$\textbf{MV}$~~~~|~~$\textbf{Bayes} & $~$\textbf{MV}$~~~~|~~$\textbf{Bayes} \\ 
+				\begin{tabular}{|c||c|c|}
+					\hline Número & máx\{$\Delta$SIR\} con & máx\{$\Delta$SIR\} con \\ 
+					de fuentes & el estimado de $\pmb{\theta}$ & conocimiento perfecto de $\pmb{\theta}$ \\ 
 					\hline \hline 
-					$0$.$0001$ &$40$.$0$& $0$.$2236^{\mathrm{o}}~|~0$.$2236^{\mathrm{o}}$ & $0$.$3391^{\mathrm{o}}~|~0$.$1871^{\mathrm{o}}$ \\
-					\hline 
-					$0$.$001$ &$30$.$0$& $0$.$4743^{\mathrm{o}}~|~0$.$4301^{\mathrm{o}}$ & $0$.$4416^{\mathrm{o}}~|~0$.$3808^{\mathrm{o}}$ \\
-					\hline 
-					$0$.$01$ &$20$.$0$& $2$.$4135^{\mathrm{o}}~|~1$.$1136^{\mathrm{o}}$ & $2$.$1107^{\mathrm{o}}~|~1$.$7176^{\mathrm{o}}$ \\
-					\hline
-					$0$.$02$ &$16$.$9$& $5$.$0453^{\mathrm{o}}~|~3$.$0668^{\mathrm{o}}$ & $1$.$4265^{\mathrm{o}}~|~1$.$1832^{\mathrm{o}}$ \\
-					\hline 
-					$0$.$06$ &$12$.$2$& $9$.$9088^{\mathrm{o}}~|~5$.$7615^{\mathrm{o}}$ & $4$.$2988^{\mathrm{o}}~|~3$.$1177^{\mathrm{o}}$ \\
-					\hline 
-					$0$.$1$ &$10$.$0$& $10$.$064^{\mathrm{o}}~|~4$.$9487^{\mathrm{o}}$ & $5$.$0813^{\mathrm{o}}~|~3$.$5043^{\mathrm{o}}$ \\
+					2 & 3.1 & 8.0  \\
 					\hline 									 			
+					3 & 3.5 & 9.1 \\
+					\hline 									 			
+					4 & 2.3 & 2.8  \\
+					\hline 							
 				\end{tabular}
 			\end{center}
 		\end{table}
+		\vspace{-3mm}
+		\pause
+		\color{red} \textbf{El desempeño del separador de las voces depende fuertemente del desempeño del localizador de las fuentes de voz.}
 	\end{frame}
 	
-	\begin{frame}{Resultados}
-		Función de costo $C_{ML}$ evaluada sobre la superficie $\{\theta_1,\theta_2\} \in \{-30^{\mathrm{o}}, 30^{\mathrm{o}}\}\times\{-30^{\mathrm{o}}, 30^{\mathrm{o}}\}$ para un escenario con dos fuentes localizadas en $\pmb{\theta} = [-10^{\mathrm{o}}~~18^{\mathrm{o}}]^T$ y $\sigma^2 = 0$.$02$.
-		\begin{figure}[h]
-			\centering
-			\includegraphics[width=0.52\linewidth]{figures/Fig3a.png}
-		\end{figure}
-	\end{frame}
+%	\begin{frame}{Resultados}
+%		Función de costo $C_{ML}$ evaluada sobre la superficie $\{\theta_1,\theta_2\} \in \{-30^{\mathrm{o}}, 30^{\mathrm{o}}\}\times\{-30^{\mathrm{o}}, 30^{\mathrm{o}}\}$ para un escenario con dos fuentes localizadas en $\pmb{\theta} = [-10^{\mathrm{o}}~~18^{\mathrm{o}}]^T$ y $\sigma^2 = 0$.$02$.
+%		\begin{figure}[h]
+%			\centering
+%			\includegraphics[width=0.52\linewidth]{figures/Fig3a.png}
+%		\end{figure}
+%	\end{frame}
+%	
+%	\begin{frame}{Resultados}
+%		Función de costo $C_{B}$ evaluada sobre la superficie $\{\theta_1,\theta_2\} \in \{-30^{\mathrm{o}}, 30^{\mathrm{o}}\}\times\{-30^{\mathrm{o}}, 30^{\mathrm{o}}\}$ para un escenario con dos fuentes localizadas en $\pmb{\theta} = [-10^{\mathrm{o}}~~18^{\mathrm{o}}]^T$ y $\sigma^2 = 0$.$02$.
+%		\begin{figure}[h]
+%			\centering
+%			\includegraphics[width=0.52\linewidth]{figures/Fig3.png}
+%		\end{figure}
+%	\end{frame}
 	
-	\begin{frame}{Resultados}
-		Función de costo $C_{B}$ evaluada sobre la superficie $\{\theta_1,\theta_2\} \in \{-30^{\mathrm{o}}, 30^{\mathrm{o}}\}\times\{-30^{\mathrm{o}}, 30^{\mathrm{o}}\}$ para un escenario con dos fuentes localizadas en $\pmb{\theta} = [-10^{\mathrm{o}}~~18^{\mathrm{o}}]^T$ y $\sigma^2 = 0$.$02$.
-		\begin{figure}[h]
-			\centering
-			\includegraphics[width=0.52\linewidth]{figures/Fig3.png}
-		\end{figure}
-	\end{frame}
-	
-	\begin{frame}{Resultados}
-		Estimación de las direcciones de arribo de tres fuentes localizadas en $\pmb{\theta} = [3^{\mathrm{o}}~~8^{\mathrm{o}}~~15^{\mathrm{o}}]^T$.				
-		\begin{figure}[h]
-			\centering
-			\includegraphics[width=0.58\linewidth]{figures/Fig21.png}
-		\end{figure}
-	\end{frame}
-	
+%	\begin{frame}{Resultados}
+%		Estimación de las direcciones de arribo de tres fuentes localizadas en $\pmb{\theta} = [3^{\mathrm{o}}~~8^{\mathrm{o}}~~15^{\mathrm{o}}]^T$.				
+%		\begin{figure}[h]
+%			\centering
+%			\includegraphics[width=0.58\linewidth]{figures/Fig21.png}
+%		\end{figure}
+%	\end{frame}
+%	
 	
 	
 	
@@ -436,22 +483,16 @@
 	
 	\begin{frame}{Conclusiones}
 		\begin{itemize}
-			\item Se obtuvo un método que permite estimar simultáneamente el número de fuentes y sus direcciones con un \textbf{reducido número de observaciones}.			
+			\item Se ha obtenido un método de \textbf{bajo costo computacional} que permite localizar \textbf{al menos 4} fuentes de voz de forma simultánea.		
 			\vspace{0.1in}
 			\pause
-			\item Presenta un \textbf{menor error cuadrático medio} que el estimador de máxima verosimilitud.			
+			\item Relativamente \textbf{buena precisión} ante ruido y reverberación moderados.			
 			\vspace{0.1in}
 			\pause
-			\item Relativamente \textbf{elevado costo computacional}.			
+			\item El desempeño se \textbf{deteriora significativamente} cuando las fuentes están en movimiento.			
 			\vspace{0.1in}
 			\pause
-			\item
-			No es aplicable a:
-			\begin{itemize}	
-				\item señales de banda ancha,
-				\item campo no lejano,
-				\item ruido correlacionado.
-			\end{itemize}
+			\item No requiere conocer exactamente el número de fuentes presentes, pero sí el \textbf{número máximo de fuentes} para la clasificación.
 		\end{itemize}
 	\end{frame}
 
