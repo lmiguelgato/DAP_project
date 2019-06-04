@@ -27,15 +27,19 @@ N = size(A,1);
 
 figure
 for j = 1:size(A,2)-1
-    polarplot(exp(1i*meanDOAs(j)/180*pi),'*','LineWidth',10);
+    polarplot(exp(1i*[meanDOAs(j) - stdevDOAs(j) meanDOAs(j) meanDOAs(j) + stdevDOAs(j)]/180*pi),':','LineWidth',4);
+    hold on;
+    polarplot(0.1*exp(1i*[-60 60 180 -60]/180*pi),'k','LineWidth',2);
     hold on;
 end
     
 for j = 1:size(A,2)-1
     hold on;
-    polarplot(exp(1i*(meanDOAs(j) + stdevDOAs(j))/180*pi),'kx','LineWidth',5);
+    polarplot([0.9*exp(1i*(meanDOAs(j) - stdevDOAs(j))/180*pi) 1.1*exp(1i*(meanDOAs(j) - stdevDOAs(j))/180*pi)],'k');
     hold on;
-    polarplot(exp(1i*(meanDOAs(j) - stdevDOAs(j))/180*pi),'kx','LineWidth',5);
+    polarplot([0.9*exp(1i*(meanDOAs(j) + stdevDOAs(j))/180*pi) 1.1*exp(1i*(meanDOAs(j) + stdevDOAs(j))/180*pi)],'k');
+%     hold on;
+%     polarplot(exp(1i*(meanDOAs(j) - stdevDOAs(j))/180*pi),'kx','LineWidth',5);
 end
 
 ax = gca;
