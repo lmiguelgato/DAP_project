@@ -60,3 +60,5 @@ doc/beamer/figures/vect/
 doc/beamer/main_beamer\.pdf
 
 *.m~
+
+doc/figures/vect/
