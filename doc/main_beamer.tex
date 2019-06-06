@@ -77,10 +77,11 @@
 	\begin{frame}{Descripción del problema}
 		% - A title should summarize the slide in an understandable fashion
 		%   for anyone how does not follow everything on the slide itself.
+		\textbf{Tarea No. 1: Estimar la dirección en donde se localizan las fuentes de voz.}
 		\begin{figure}[h]
 			\includegraphics[width=0.55\linewidth]{figures/array1.png}
 		\end{figure}
-	\hspace{7mm}\textbf{Tarea No. 1: Estimar la dirección en donde se localizan las fuentes de voz.}
+	\tiny{[1] C. Rascón, \textit{Curso de Audición Robótica. Sesión 05: Corpus AIRA}, IIMAS, UNAM, 2019.}
 	\end{frame}
 	
 	\begin{frame}{Descripción del problema}
@@ -170,15 +171,15 @@
 		\textbf{Modelo de campo lejano:}
 		\begin{figure}[h]
 			\centering
-			\includegraphics[width=0.7\linewidth]{figures/array2.png}
-		\end{figure}
+			\includegraphics[width=0.55\linewidth]{figures/array2.png}	
+		\end{figure}		
 	\end{frame}
 	
 	\begin{frame}{Modelo geométrico de propagación}
 		\textbf{Modelo de campo lejano:}
 		\begin{figure}[h]
 			\centering
-			\includegraphics[width=0.7\linewidth]{figures/array3.png}
+			\includegraphics[width=0.55\linewidth]{figures/array3.png}
 		\end{figure}
 	\end{frame}
 	
@@ -227,20 +228,20 @@
 	\begin{frame}{Estimación de las direcciones de arribo}
 		\textbf{Se estima, para cada par de micrófonos la dirección de arribo:}
 		\begin{equation}
-			\theta_{12} = \frac{\mathrm{sen}^{-1}(c \Delta t_{12})}{d}~~~~~\theta_{23} = \frac{\mathrm{sen}^{-1}(c \Delta t_{23})}{d}~~~~~\theta_{31} = \frac{\mathrm{sen}^{-1}(c \Delta t_{31})}{d}
+			\theta_{12} = \mathrm{sen}^{-1}\left(\frac{k_{12}c}{f_\mathrm{s}d}\right)~~~~~\theta_{23} = \mathrm{sen}^{-1}\left(\frac{k_{23}c}{f_\mathrm{s}d}\right)~~~~~\theta_{31} = \mathrm{sen}^{-1}\left(\frac{k_{31}c}{f_\mathrm{s}d}\right)
 		\end{equation}		
-		\hspace{5mm}
-		\begin{minipage}{70mm}
-			\begin{figure}[h]
-				\centering
-				\includegraphics[width=0.9\linewidth]{figures/DOAvsDelay}
-			\end{figure}
-		\end{minipage}
-		\hspace{10mm}
+		\hspace{5mm}		
 		\begin{minipage}{50mm}
 			\begin{figure}[h]
 				\centering
 				\includegraphics[width=\linewidth]{figures/reference}
+			\end{figure}
+		\end{minipage}
+		\hspace{20mm}
+		\begin{minipage}{70mm}
+			\begin{figure}[h]
+				\centering
+				\includegraphics[width=0.9\linewidth]{figures/DOAvsDelay.eps}
 			\end{figure}
 		\end{minipage}
 		
@@ -257,6 +258,8 @@
 				\centering
 				\includegraphics[width=\linewidth]{figures/redundancia}
 			\end{figure}
+			\vspace{-8mm}
+			~~~~~~~~~~~\tiny{[2] Rascon, C.; Fuentes, G.; Meza, I. \textit{Lightweight multi-DOA tracking of mobile speech sources}. EURASIP Journal on Audio, Speech, and Music Processing, 2015, vol. 2015, no 1, p. 11.}.
 		\end{minipage}
 	\hspace{5mm}
 		\begin{minipage}{60mm}
@@ -275,6 +278,8 @@
 		\centering
 		\includegraphics[width=0.5\linewidth]{figures/nonoverlap}
 	\end{figure}
+	\vspace{-2mm}
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\tiny{Tomado de [2].}
 	\end{frame}
 	
 	\begin{frame}{Estimación de las direcciones de arribo}
@@ -347,6 +352,8 @@
 			\centering
 			\includegraphics[width=0.7\linewidth]{figures/steer}
 		\end{figure}
+		\vspace{-2.5mm}
+		\tiny {[3] “Delay Sum Beamforming - The Lab Book Pages.” [Online]. Available: http://www.labbookpages.co.uk/audio/beamforming/delaySum.html.}\\ %\tiny{[Accessed: 05-Jun-2019].}
 	\end{frame}
 	
 	\begin{frame}{Separación de las fuentes de voz}
@@ -365,6 +372,7 @@
 			\centering
 			\includegraphics[width=0.8\linewidth]{figures/Buffers.eps}
 		\end{figure}
+		\tiny{[4] C. Rascón, \textit{Curso de Audición Robótica. Sesión 06.2: Estimación de Múltiples Direcciones de Arribo}, IIMAS, UNAM, 2019.}
 	\end{frame}
 	
 	\section{Resultados}
@@ -430,25 +438,27 @@
 	\end{frame}
 	
 	\begin{frame}{Resultados}
-		\textbf{Se usó la librería BSS\_EVAL\footnote{E. Vincent, R. Gribonval and C. Févotte, \textit{Performance measurement in blind audio source separation}, IEEE Trans. Audio, Speech and Language Processing, 14(4), pp 1462-1469, 2006.} para evaluar el desempeño del formador de haz, y estos son algunos ejemplos de resultados obtenidos:}
+		\textbf{Se usó la librería BSS\_EVAL [3] para evaluar el desempeño del formador de haz, y estos son algunos ejemplos de resultados obtenidos:}
 		\begin{table}[H]
 			\begin{center}
 				\begin{tabular}{|c||c|c|}
 					\hline Número & máx\{$\Delta$SIR\} con & máx\{$\Delta$SIR\} con \\ 
-					de fuentes & el estimado de $\pmb{\theta}$ & conocimiento perfecto de $\pmb{\theta}$ \\ 
+					de fuentes & conocimiento perfecto de $\pmb{\theta}$ & el estimado de $\pmb{\theta}$ \\ 
 					\hline \hline 
-					2 & 3.1 & 8.0  \\
+					2 & 8.0 & 3.1 \\
 					\hline 									 			
-					3 & 3.5 & 9.1 \\
+					3 & 9.1 & 3.5 \\
 					\hline 									 			
-					4 & 2.3 & 2.8  \\
+					4 & 2.8 & 2.3  \\
 					\hline 							
 				\end{tabular}
 			\end{center}
 		\end{table}
 		\vspace{-3mm}
-		\pause
-		\color{red} \textbf{En general, el desempeño del separador de las voces depende fuertemente del desempeño del localizador de las fuentes de voz.}
+		
+		En general, el desempeño del separador de las voces depende fuertemente del desempeño del localizador de las fuentes de voz.\\
+		\vspace{8mm}
+		\color{black} \tiny{[5] E. Vincent, \textit{et al.}, \textit{Performance measurement in blind audio source separation}, IEEE Trans. Audio, Speech and Lang. Proc., 14(4), pp. 1462-1469, 2006.}
 	\end{frame}
 	
 %	\begin{frame}{Resultados}
