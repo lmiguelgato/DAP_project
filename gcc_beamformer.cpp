@@ -50,7 +50,7 @@ using namespace std;
 #define DYNAMIC_GCC_TH 1				// enable a dynamic GCC threshold (0: disabled, 1: mean peak values, 2: max peak values)
 #define MOVING_AVERAGE 1				// enable a moving average on kmeans centroids (0: disabled, 1: finite memory, 2: infinite memory)
 #define MOVING_FACTOR 1					// allow variations in DOA if the sources are moving
-#define MEMORY_FACTOR 20				// memory of the k-means algorithm
+#define MEMORY_FACTOR 5				// memory of the k-means algorithm
 #define DEBUG false		
 
 // JACK:
