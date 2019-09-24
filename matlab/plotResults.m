@@ -2,18 +2,20 @@ close all
 clear
 clc
 
-addpath('../output')
+N = 4;
 
-N = 1;
+addpath(['../output/clean-' num2str(N) 'source/'])
 
 A = textread(['tabbed' num2str(N) 'data.txt'], '', 'delimiter', ',', ... 
                 'emptyvalue', NaN);
-
-% meanDOAs  = nanmean(A(:, 1:end-1));
-% stdevDOAs = sqrt(nanvar(A(:, 1:end-1)));
-            
-meanDOAs  = nanmean(A(end-51:end, 1:end-1));
-stdevDOAs = sqrt(nanvar(A(end-51:end, 1:end-1)));
+				
+if (size(A,1) > 50)
+    meanDOAs  = nanmean(A(end-51:end, 1:end-1));
+    stdevDOAs = sqrt(nanvar(A(end-51:end, 1:end-1)));
+else
+    meanDOAs  = nanmean(A(:, 1:end-1));
+	stdevDOAs = sqrt(nanvar(A(:, 1:end-1)));
+end
             
 disp(['Mean DOAs:          ' num2str(meanDOAs)])
 disp(['Standard deviation: ' num2str(stdevDOAs)])
@@ -25,15 +27,19 @@ N = size(A,1);
 
 figure
 for j = 1:size(A,2)-1
-    polarplot(exp(1i*meanDOAs(j)/180*pi),'*','LineWidth',5);
+    polarplot(exp(1i*[meanDOAs(j) - stdevDOAs(j) meanDOAs(j) meanDOAs(j) + stdevDOAs(j)]/180*pi),':','LineWidth',4);
+    hold on;
+    polarplot(0.1*exp(1i*[-60 60 180 -60]/180*pi),'k','LineWidth',2);
     hold on;
 end
     
 for j = 1:size(A,2)-1
     hold on;
-    polarplot(exp(1i*(meanDOAs(j) + stdevDOAs(j))/180*pi),'kx');
+    polarplot([0.9*exp(1i*(meanDOAs(j) - stdevDOAs(j))/180*pi) 1.1*exp(1i*(meanDOAs(j) - stdevDOAs(j))/180*pi)],'k');
     hold on;
-    polarplot(exp(1i*(meanDOAs(j) - stdevDOAs(j))/180*pi),'kx');
+    polarplot([0.9*exp(1i*(meanDOAs(j) + stdevDOAs(j))/180*pi) 1.1*exp(1i*(meanDOAs(j) + stdevDOAs(j))/180*pi)],'k');
+%     hold on;
+%     polarplot(exp(1i*(meanDOAs(j) - stdevDOAs(j))/180*pi),'kx','LineWidth',5);
 end
 
 ax = gca;
