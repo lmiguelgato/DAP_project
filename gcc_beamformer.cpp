@@ -1,4 +1,4 @@
-	/**
+/*
  * Final Project of Digital Audio Processing
  *
  * Objectives:
@@ -19,6 +19,7 @@
 #include <fstream>
 using namespace std;
 
+// Useful functions developed by myself:
 #include "tools/max.h"
 #include "tools/angleTranslation.h"
 #include "tools/unwrap.h"
@@ -44,14 +45,14 @@ using namespace std;
 #include <sndfile.h>
 
 #define RAD2DEG 57.295779513082323f		// useful to convert from radians to degrees
-#define GCC_STYLE 4						// 1: GCC, 2:GCC (frequency restrained), 3:GCC-PHAT, 4:GCC-PHAT (frequency restrained)
+#define GCC_STYLE 1						// 1: GCC, 2:GCC (frequency restrained), 3:GCC-PHAT, 4:GCC-PHAT (frequency restrained)
 #define GCC_TH 120.0f					// correlation threshold (to avoid false alarms)
-#define REDUNDANCY_TH 20.0f				// redundancy threshold (for DOA estimation)
+#define REDUNDANCY_TH 15.0f				// redundancy threshold (for DOA estimation)
 #define DYNAMIC_GCC_TH 1				// enable a dynamic GCC threshold (0: disabled, 1: mean peak values, 2: max peak values)
 #define MOVING_AVERAGE 1				// enable a moving average on kmeans centroids (0: disabled, 1: finite memory, 2: infinite memory)
-#define MOVING_FACTOR 1					// allow variations in DOA if the sources are moving
-#define MEMORY_FACTOR 5				// memory of the k-means algorithm
-#define DEBUG false		
+#define MOVING_FACTOR 1					// allow variations in DOA if the sources are moving (how many times the standard deviation)
+#define MEMORY_FACTOR 10				// memory of the k-means algorithm
+#define VERBOSE false					// display additional information
 
 // JACK:
 jack_port_t **input_ports;
@@ -120,7 +121,6 @@ int    ccounter = 0;					// number of cycles
 int    hist_length;						// number of cycles
 
 ofstream outputFile;					// save results for data analysis
-ofstream tabbedFile;					// save results for data analysis
 
 /**
  * The process callback for this JACK application is called in a
@@ -245,7 +245,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 			break;
 	}
 
-	if (DEBUG)
+	if (VERBOSE)
 	{
 		printf("theta1 = [%1.5f, %1.5f];\ttheta2 = [%1.5f, %1.5f];\ttheta3 = [%1.5f, %1.5f]\n", theta[0], theta[3], theta[1], theta[4], theta[2], theta[5]);
 		printf("val1 = %1.5f;\tval2 = %1.5f;\tval3 = %1.5f\n", max_val12, max_val23, max_val31);
@@ -254,6 +254,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 	}
 
 	if (doa != 181.0 && max_val12 > 0.9*gcc_th && max_val23 > 0.9*gcc_th && max_val31 > 0.9*gcc_th) { 	// are these DOAs valid?
+		outputFile << icounter << ':' << ' ';
 		DOA_hist[icounter%hist_length] = doa; 	// save into shift register
 		++icounter;
 
@@ -283,15 +284,23 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 							DOA_valid[i] = DOA_mean[i];
 
 							printf("*** DOA[%d] = %1.4f\n", i, DOA_valid[i]);	
-							outputFile << DOA_valid[i];					// save results into text file
-							tabbedFile << DOA_valid[i];					// save results into text file
+							outputFile << DOA_valid[i];			// save results into text file
 					}
+
+				} else {
+						outputFile << ',' << ' ';			// save results into text file
 				}
-				tabbedFile << ", ";
+				outputFile << ", ";
 			}
-			tabbedFile << endl;
 			printf("\n");	
+		} 
+		else {
+			for (i = 0; i < n_sources; ++i)
+			{
+				outputFile << ',' << ' ';
+			}
 		}
+		outputFile << endl;
 	}
 
 	int write_count;
@@ -576,7 +585,7 @@ int main (int argc, char *argv[]) {
 	int i;
 
 	if(argc != 4 && argc != 3){		
-		printf ("Usage:\ndap_project d N k\nd: Microphone separation (in meters).\nN: Maximum number of sources.\nk: Which source to filter.\n");
+		printf ("Usage:\ndap_project d N k\nd: Microphone separation (in meters).\nN: Maximum number of sources.\nk: Which source to filter (optional parameter, the default option is filtering all sources).\n");
 		exit(1);
 	}
 
@@ -607,8 +616,6 @@ int main (int argc, char *argv[]) {
 	char fileName[30];
 	sprintf(fileName, "output/debug_%ddata.txt", n_sources);
 	outputFile.open(fileName);
-	sprintf(fileName, "output/tabbed%ddata.txt", n_sources);
-	tabbedFile.open(fileName);
 
 	dt_max = mic_separation/c;
 	N_max = dt_max*sample_rate;
@@ -832,6 +839,5 @@ int main (int argc, char *argv[]) {
 	jack_client_close (client);
 	//sf_close(audio_file);
 	outputFile.close();
-	tabbedFile.close();
 	exit (0);
 }
