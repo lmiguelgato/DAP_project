@@ -4,9 +4,13 @@ clc
 
 addpath('../output')
 
-max_num_sources = 1;
+max_num_sources = 2;
 
-fileID  = fopen(['debug_' num2str(max_num_sources) 'data.txt']);
+if max_num_sources == 1
+    fileID  = fopen(['track_' num2str(max_num_sources) '_source.txt']);
+else
+    fileID  = fopen(['track_' num2str(max_num_sources) '_sources.txt']);
+end
 
 format = '%d:';
 for i = 1:max_num_sources
@@ -14,6 +18,17 @@ for i = 1:max_num_sources
 end
 
 A       = textscan(fileID, format, 'Delimiter',',','EmptyValue',NaN);
+
+
+for i = 1:max_num_sources
+    temp = A{1+i};
+    for j = 1:length(temp)
+        if temp(j) == 181
+            temp(j) = NaN;
+        end
+    end
+    A{1+i} = temp;
+end
 
 meanDOAs = zeros(max_num_sources,1);
 stdevDOAs = meanDOAs;
@@ -26,7 +41,7 @@ for i = 1:max_num_sources
     hold on
     plot(A{1}, A{i+1},'LineWidth',2)
 end
-ylim([-184 184])
+ylim([-180.5 180.5])
 grid on
 
 figure
