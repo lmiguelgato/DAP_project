@@ -13,10 +13,10 @@ axes1 = axes('Parent',figure1);
 hold(axes1,'on');
 
 % Create multiple lines using matrix input to stem
-stem1 = stem(A,'Marker','*','LineWidth',3,'LineStyle','none',...
+for i = 2:size(A,2)
+    stem1 = stem(A{i},'Marker','*','LineWidth',3,'LineStyle','none',...
     'Parent',axes1);
-for i = 1:size(A, 2)-1
-    set(stem1(i),'MarkerSize',5);
+    set(stem1,'MarkerSize',5);
 end
 
 % Create xlabel

@@ -4,50 +4,56 @@ clc
 
 addpath('../output')
 
-N = 2;
+max_num_sources = 1;
 
-A = textread(['tabbed' num2str(N) 'data.txt'], '', 'delimiter', ',', ... 
-                'emptyvalue', NaN);
+INpath = ['../corpus/' num2str(max_num_sources) ' Source/'];
+
+%% loading ground truth:
+[mdoa.name, mdoa.path] = uigetfile('*.mdoa', ...
+    'Select ground truth.', INpath);
+
+if max_num_sources == 1
+    fileID  = fopen(['track_' num2str(max_num_sources) '_source.txt']);
+else
+    fileID  = fopen(['track_' num2str(max_num_sources) '_sources.txt']);
+end
+
+format = '%d:';
+for i = 1:max_num_sources
+    format = strcat(format, ' %f');
+end
+
+A = textscan(fileID, format, 'Delimiter',',','EmptyValue',NaN);
+
+for i = 1:max_num_sources
+    temp = A{1+i};
+    for j = 1:length(temp)
+        if temp(j) == 181
+            temp(j) = NaN;
+        end
+    end
+    A{1+i} = temp;
+end
 
 createfigure(A)
-axis([1 size(A,1) -184 184])
+ylim([-180.5 180.5])
 
-if N == 1
-    [samples, dynDOA1] = textread('goldstandard.mdoa', ...
-'Sample: %d\n\nDOAS:\n\n%f\n\n---\n\n');
-hold on
-plot(resample(dynDOA1, size(A,1), length(dynDOA1)), 'r', 'LineWidth',3)
+mdoa.format = 'Sample: %d\n\nDOAS:\n\n';
+for i = 1:max_num_sources
+    mdoa.format = strcat(mdoa.format, '%f\n');
+end
+mdoa.format = strcat(mdoa.format, '\n---\n\n');
+
+if max_num_sources == 1
+    [samples, dynDOA1] = textread([mdoa.path, mdoa.name], mdoa.format);
+    hold on
+    plot(resample(dynDOA1, size(A,1), length(dynDOA1)), 'r', 'LineWidth',3)
 end
 
-if N == 2
-    [samples, dynDOA1, dynDOA2] = textread('goldstandard.mdoa', ...
-'Sample: %d\n\nDOAS:\n\n%f\n%f\n\n---\n\n');
-hold on
-plot(resample(dynDOA1, size(A,1), length(dynDOA1)), 'r', 'LineWidth',3)
-hold on
-plot(resample(dynDOA2, size(A,1), length(dynDOA2)), 'g', 'LineWidth',3)
-end
-
-if N == 3
-    [samples, dynDOA1, dynDOA2, dynDOA3] = textread('goldstandard.mdoa', ...
-'Sample: %d\n\nDOAS:\n\n%f\n%f\n%f\n\n---\n\n');
-hold on
-plot(resample(dynDOA1, size(A,1), length(dynDOA1)), 'r', 'LineWidth',3)
-hold on
-plot(resample(dynDOA2, size(A,1), length(dynDOA2)), 'g', 'LineWidth',3)
-hold on
-plot(resample(dynDOA3, size(A,1), length(dynDOA3)), 'c', 'LineWidth',3)
-end
-
-if N == 4
-    [samples, dynDOA1, dynDOA2, dynDOA3, dynDOA4] = textread('goldstandard.mdoa', ...
-'Sample: %d\n\nDOAS:\n\n%f\n%f\n%f\n%f\n\n---\n\n');
-hold on
-plot(resample(dynDOA1, size(A,1), length(dynDOA1)), 'r', 'LineWidth',3)
-hold on
-plot(resample(dynDOA2, size(A,1), length(dynDOA2)), 'g', 'LineWidth',3)
-hold on
-plot(resample(dynDOA3, size(A,1), length(dynDOA3)), 'c', 'LineWidth',3)
-hold on
-plot(resample(dynDOA4, size(A,1), length(dynDOA4)), 'y', 'LineWidth',3)
+if max_num_sources == 2
+    [samples, dynDOA1, dynDOA2] = textread([mdoa.path, mdoa.name], mdoa.format);
+    hold on
+    plot(resample(dynDOA1, size(A,1), length(dynDOA1)), 'r', 'LineWidth',3)
+    hold on
+    plot(resample(dynDOA2, size(A,1), length(dynDOA2)), 'g', 'LineWidth',3)
 end
