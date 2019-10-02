@@ -5,12 +5,16 @@ clc
 addpath('./tools')
 addpath('./tools/bss_eval')
 
-N = 3;
+N = 2;
 
-INpath = ['../corpus/corpus48000/clean-' num2str(N) 'source090180/'];
+INpath = ['../corpus/' num2str(N) ' Source/'];
 OUTpath = '../output/';
 
-fs = 48e3;
+%% loading and pre-processing base audio:
+[audio.name, audio.path] = uigetfile('*.wav', ...
+    'Select reference audio (wav_mic1).', INpath);
+
+[x, fs] = audioread([audio.path audio.name]);
 
 T = 20;
 
@@ -22,16 +26,14 @@ D1 = 0.010*fs;
 
 L = round(T*fs);
 
-[x, ~] = audioread([INpath 'wav_mic1.wav']);
-
 S = zeros(N, L-D);
 for i = 1:N
-    [s, ~] = audioread([INpath 'pristine_channel' num2str(i) '.wav']);
+    [s, ~] = audioread([audio.path 'pristine_channel' num2str(i) '.wav']);
     S(i, :) = s(1:L-D)';
 end
 
 for k1 = 1:N
-    [y, ~] = audioread([OUTpath 'audio_' num2str(N) '_(' num2str(k1) ').wav']);
+    [y, ~] = audioread([OUTpath 'bf_audio_' num2str(k1) '_of_' num2str(N) '.wav']);
     y = y(D+1:L);
     
     for k2 = 1:N
