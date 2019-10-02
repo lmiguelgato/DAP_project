@@ -17,6 +17,7 @@
 #include <random>
 #include <iostream>
 #include <fstream>
+#include <iomanip>
 using namespace std;
 
 // Useful functions developed by myself:
@@ -45,12 +46,12 @@ using namespace std;
 #include <sndfile.h>
 
 #define RAD2DEG 57.295779513082323f		// useful to convert from radians to degrees
-#define GCC_STYLE 1						// 1: GCC, 2:GCC (frequency restrained), 3:GCC-PHAT, 4:GCC-PHAT (frequency restrained)
+#define GCC_STYLE 4						// 1: GCC, 2:GCC (frequency restrained), 3:GCC-PHAT, 4:GCC-PHAT (frequency restrained)
 #define GCC_TH 120.0f					// correlation threshold (to avoid false alarms)
-#define REDUNDANCY_TH 15.0f				// redundancy threshold (for DOA estimation)
+#define REDUNDANCY_TH 10.0f				// redundancy threshold (for DOA estimation)
 #define DYNAMIC_GCC_TH 1				// enable a dynamic GCC threshold (0: disabled, 1: mean peak values, 2: max peak values)
 #define MOVING_AVERAGE 1				// enable a moving average on kmeans centroids (0: disabled, 1: finite memory, 2: infinite memory)
-#define MOVING_FACTOR 1					// allow variations in DOA if the sources are moving (how many times the standard deviation)
+#define MOVING_FACTOR 4					// allow variations in DOA if the sources are moving (how many times the standard deviation)
 #define MEMORY_FACTOR 10				// memory of the k-means algorithm
 #define VERBOSE false					// display additional information
 
@@ -283,21 +284,20 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 						else
 							DOA_valid[i] = DOA_mean[i];
 
-							printf("*** DOA[%d] = %1.4f\n", i, DOA_valid[i]);	
-							outputFile << DOA_valid[i];			// save results into text file
+							printf("DOA[%d] = %1.1f\n", i, DOA_valid[i]);
+							outputFile << setprecision(2) << DOA_valid[i];			// save results into text file
 					}
 
 				} else {
-						outputFile << ',' << ' ';			// save results into text file
+						outputFile << 181;			// save results into text file
 				}
 				outputFile << ", ";
 			}
-			printf("\n");	
 		} 
 		else {
 			for (i = 0; i < n_sources; ++i)
 			{
-				outputFile << ',' << ' ';
+				outputFile << 181 << ',' << ' ';
 			}
 		}
 		outputFile << endl;
@@ -313,7 +313,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 				delay[0] = (int) (mic_separation*sin(DOA_valid[source2filter-1]/RAD2DEG)/c*sample_rate);
 				delay[1] = (int) (mic_separation*sin((120.0-DOA_valid[source2filter-1])/RAD2DEG)/c*sample_rate);
 
-				printf("\n\n------> doa = %1.5f\n", DOA_valid[source2filter-1]);
+				//printf("doa = %1.5f\n", DOA_valid[source2filter-1]);
 
 				//----  BEAMFORMING:
 
@@ -610,12 +610,15 @@ int main (int argc, char *argv[]) {
 	}
 
 	system("mkdir -p output");
-	char audio_file_path[40];
-	sprintf(audio_file_path, "output/audio_%d_(%d).wav", n_sources, source2filter);
+	char audio_file_path[100];
+	sprintf(audio_file_path, "./output/bf_audio_%d_of_%d.wav", source2filter, n_sources);
 
-	char fileName[30];
-	sprintf(fileName, "output/debug_%ddata.txt", n_sources);
-	outputFile.open(fileName);
+	char text_file_path[100];
+	if (n_sources == 1)
+		sprintf(text_file_path, "./output/track_%d_source.txt", n_sources);
+	else		
+		sprintf(text_file_path, "./output/track_%d_sources.txt", n_sources);
+	outputFile.open(text_file_path);
 
 	dt_max = mic_separation/c;
 	N_max = dt_max*sample_rate;
@@ -755,12 +758,14 @@ int main (int argc, char *argv[]) {
 	if (source2filter == 0) {
 		for (i = 0; i < n_sources; ++i)
 		{
-			printf("Trying to open audio File: audio_%d_(%d).wav",n_sources,i+1);
+			printf("Trying to open audio File: ./output/bf_audio_%d_of_%d.wav\n", i+1, n_sources);
 			audio_info.samplerate = sample_rate;
 			audio_info.channels = 1;
 			audio_info.format = SF_FORMAT_WAV | SF_FORMAT_PCM_32;
-			sprintf(audio_file_path, "output/audio_%d_(%d).wav", n_sources, i+1);
+
+			sprintf(audio_file_path, "./output/bf_audio_%d_of_%d.wav", i+1, n_sources);
 			audio_file[i] = sf_open (audio_file_path,SFM_WRITE,&audio_info);
+
 			if(audio_file[i] == NULL){
 				printf("%s\n",sf_strerror(NULL));
 				exit(1);
