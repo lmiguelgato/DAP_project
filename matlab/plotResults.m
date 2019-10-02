@@ -17,7 +17,7 @@ for i = 1:max_num_sources
     format = strcat(format, ' %f');
 end
 
-A       = textscan(fileID, format, 'Delimiter',',','EmptyValue',NaN);
+A = textscan(fileID, format, 'Delimiter',',','EmptyValue',NaN);
 
 
 for i = 1:max_num_sources
@@ -57,8 +57,6 @@ for j = 1:max_num_sources
     polarplot([0.9*exp(1i*(meanDOAs(j) - stdevDOAs(j))/180*pi) 1.1*exp(1i*(meanDOAs(j) - stdevDOAs(j))/180*pi)],'k');
     hold on;
     polarplot([0.9*exp(1i*(meanDOAs(j) + stdevDOAs(j))/180*pi) 1.1*exp(1i*(meanDOAs(j) + stdevDOAs(j))/180*pi)],'k');
-%     hold on;
-%     polarplot(exp(1i*(meanDOAs(j) - stdevDOAs(j))/180*pi),'kx','LineWidth',5);
 end
 
 ax = gca;
@@ -66,4 +64,3 @@ ax.ThetaLim = [-180 180];
 ax.RTickLabel = {''};
 ax.ThetaZeroLocation = 'top';
 ax.ThetaDir = 'clockwise';
-

@@ -10,7 +10,7 @@ N = 2;
 INpath = ['../corpus/' num2str(N) ' Source/'];
 OUTpath = '../output/';
 
-%% loading and pre-processing base audio:
+%% loading reference audio:
 [audio.name, audio.path] = uigetfile('*.wav', ...
     'Select reference audio (wav_mic1).', INpath);
 
