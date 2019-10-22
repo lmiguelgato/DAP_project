@@ -19,19 +19,23 @@ end
 
 A = textscan(fileID, format, 'Delimiter',',','EmptyValue',NaN);
 
+numDOAs   = zeros(max_num_sources,1);
 
 for i = 1:max_num_sources
     temp = A{1+i};
     for j = 1:length(temp)
         if temp(j) == 181
             temp(j) = NaN;
+        else
+            numDOAs(i) = numDOAs(i) + 1;
         end
     end
     A{1+i} = temp;
 end
 
-meanDOAs = zeros(max_num_sources,1);
+meanDOAs  = zeros(max_num_sources,1);
 stdevDOAs = meanDOAs;
+numDOAs   = numDOAs/sum(numDOAs)*100;
 
 figure
 for i = 1:max_num_sources
@@ -46,11 +50,14 @@ grid on
 
 figure
 for j = 1:max_num_sources
-    polarplot(exp(1i*[meanDOAs(j) - stdevDOAs(j) meanDOAs(j) meanDOAs(j) + stdevDOAs(j)]/180*pi),':','LineWidth',4);
-    hold on;
-    polarplot(0.1*exp(1i*[-60 60 180 -60]/180*pi),'k','LineWidth',2);
-    hold on;
+    if ~isnan(meanDOAs(j)) && ~isnan(stdevDOAs(j))
+        tmp = exp(1i*[meanDOAs(j) - stdevDOAs(j) meanDOAs(j) meanDOAs(j) + stdevDOAs(j)]/180*pi);
+        polarplot(tmp,':','LineWidth',ceil(8*numDOAs(j)/100));
+        hold on;
+        text(imag(tmp(2)),real(tmp(2)),[num2str(round(numDOAs(j))) ' %'])
+    end
 end
+polarplot(0.1*exp(1i*[-60 60 180 -60]/180*pi),'k','LineWidth',2);
     
 for j = 1:max_num_sources
     hold on;
