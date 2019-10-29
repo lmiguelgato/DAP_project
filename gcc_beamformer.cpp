@@ -27,6 +27,7 @@ using namespace std;
 #include "tools/phat.h"
 #include "tools/angleRedundancy.h"
 #include "tools/kmeans.h"
+#include "tools/kalman.h"
 
 // JACK: professional sound server daemon that provides real-time, 
 //       low-latency connections for both audio and MIDI data between applications that use its API.
