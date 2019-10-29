@@ -21,10 +21,9 @@ using namespace std;
 
 // Useful functions developed by myself:
 #include "tools/max.h"
-#include "tools/angleTranslation.h"
 #include "tools/unwrap.h"
 #include "tools/phat.h"
-#include "tools/angleRedundancy.h"
+#include "tools/angleManipulation.h"
 #include "tools/kmeans.h"
 #include "tools/kalman.h"
 

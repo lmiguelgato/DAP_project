@@ -1,4 +1,38 @@
-#include "angleRedundancy.h"
+#include "angleManipulation.h"
+
+double state2angle (double* state) {
+
+	/*
+		Convert a state (Cartesian coordinates) to the corresponding angle
+
+		input: 	state (Cartesian coordinates)
+		output: (the corresponding angle)
+	*/
+
+	if (state[1] == 0.0) {
+		if (state[0] >= 0.0)
+			return 90.0;
+		else
+			return -90.0;
+	} else {
+		return atan(state[0]/state[1]);
+	}
+	
+}
+
+void angle2state (double angle, double* state) {
+
+	/*
+		Convert an angle to its corresponding state (Cartesian coordinates)
+
+		input: 	an angle (in radians)
+		output: state (the corresponding Cartesian coordinates)
+	*/
+
+	state[0] = sin(angle);
+	state[1] = cos(angle);
+	
+}
 
 double angleRedundancy (double* theta, double* thetaRedundant, double Ethresh) {
 	int i, j, k;
@@ -53,4 +87,33 @@ double angleRedundancy (double* theta, double* thetaRedundant, double Ethresh) {
 
 	return doa;
 
+}
+
+void angleTranslation (double *theta) {
+
+	int i;
+
+	for (i = 0; i < 3; ++i) {
+		if (theta[i] > 0.0) {
+			theta[i+3] = 180.0 - theta[i];
+		} else {
+			theta[i+3] = -180.0 - theta[i];
+		}
+	}
+
+	theta[1] -= 120.0;
+	theta[2] += 120.0;
+	theta[4] -= 120.0;
+	theta[5] += 120.0;
+
+	for (i = 0; i < 6; ++i) {
+		if (theta[i] > 180.0) {
+			theta[i] -= 360.0;
+		}
+		if (theta[i] < -180.0) {
+			theta[i] += 360.0;
+		}
+	}
+
+	return;
 }
