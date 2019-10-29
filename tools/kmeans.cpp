@@ -1,5 +1,4 @@
 #include "kmeans.h"
-#include <stdio.h>
 #include <math.h>
 #define DEG2RAD 0.017453292519943		// useful to convert from degrees to radians
 #define RAD2DEG 57.295779513082323f		// useful to convert from radians to degrees

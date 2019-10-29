@@ -1,5 +1,4 @@
 #include "max.h"
-//#define DELTA 0.0000000001f
 
 int max (std::complex<double> *signal, int signal_length, int Nmax, double *max_value) {
 	int max_index = -1;
