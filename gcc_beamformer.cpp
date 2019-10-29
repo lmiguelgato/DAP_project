@@ -109,6 +109,7 @@ std::complex<double> *Aux_gcc;			// store axuliary GCC result (length 2 times 'n
 
 // DOA registers:
 double *DOA_hist;						// store DOA history
+int    *DOA_class;						// store classification of DOA history
 double *DOA_kmean;						// store DOA mean for each source (kmeans algorithm)
 double *DOA_mean;						// store DOA mean for each source
 double *DOA_stdev;						// store DOA standard deviation for each source
@@ -261,7 +262,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		if (icounter >= hist_length) {	// is the shift register full?
 
 			// group similar DOAs into clusters using the k-means algorithm:
-			kmeans (DOA_hist, DOA_kmean, counter, n_sources, hist_length);
+			kmeans (DOA_hist, DOA_class, DOA_kmean, counter, n_sources, hist_length);
 
 			for (i = 0; i < n_sources; ++i)
 			{
@@ -670,6 +671,7 @@ int main (int argc, char *argv[]) {
 	X_gcc		= (std::complex<double> **) calloc(n_in_channels, sizeof(std::complex<double>*));
 	Aux_gcc		= (std::complex<double> *) calloc(window_size_2, sizeof(std::complex<double>));
 	DOA_hist	= (double *) calloc(hist_length, sizeof(double));
+	DOA_class	= (int *) calloc(hist_length, sizeof(int));
 	DOA_kmean	= (double *) calloc(n_sources, sizeof(double));
 	DOA_mean	= (double *) calloc(n_sources, sizeof(double));
 	DOA_stdev	= (double *) calloc(n_sources, sizeof(double));
