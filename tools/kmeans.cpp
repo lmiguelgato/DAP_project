@@ -20,8 +20,7 @@ void kmeans (double* DOA_hist, double* DOA_mean, int* class_count, int n_sources
 	{
 		min_dist = 10; 	// a number grater than 4
 		for (i = 0; i < n_sources; ++i)
-		{			
-			//dist = abs(DOA_hist[j] - DOA_mean[i]);
+		{
 			dist = pow(cos(DOA_hist[j]*DEG2RAD) - cos(DOA_mean[i]*DEG2RAD), 2) + pow(sin(DOA_hist[j]*DEG2RAD) - sin(DOA_mean[i]*DEG2RAD), 2);
 			if (dist < min_dist) {
 				min_dist = dist;
@@ -32,46 +31,70 @@ void kmeans (double* DOA_hist, double* DOA_mean, int* class_count, int n_sources
 	}
 
 	for (i = 0; i < n_sources; ++i)
-	{			
-		//DOA_mean[i] = 0.0;
-		//printf("i = %d\n", i);
+	{
 		for (j = 0; j < hist_length; ++j)
 		{
 			if 	(DOA_class[j] == i) {
 				DOA_mean[i] += DOA_hist[j];
-				//printf("DOA_hist[%d] = %1.5f\n", j, DOA_hist[j]);
 			}
 		}
 		if (class_count[i] != 0)
 			DOA_mean[i] /= (class_count[i]+1);
+	}
+}
 
-		/*if (class_count[i] != 0) {
-			DOA_mean[i] /= (class_count[i]);
-		} else {
-			DOA_mean[i] = 360.0/n_sources*i + 360.0/2.0/n_sources;
-			if (DOA_mean[i] > 180.0) {
-				DOA_mean[i] -= 360.0;
-			}
-		}*/
+void kmeans (double* DOA_hist, int *DOA_class, double* DOA_mean, int* class_count, int n_sources, int hist_length) {
+	int i, j;
+	double min_dist, dist;
+	double x, y;
+
+	for (i = 0; i < n_sources; ++i)
+	{
+		class_count[i] = 0;
 	}
 
-	/*for (i = 0; i < n_sources; ++i)
-	{	
-		x = 0.0;
-		y = 0.0;
+	for (j = 0; j < hist_length; ++j)
+	{
+		min_dist = 10; 	// a number grater than 4
+		for (i = 0; i < n_sources; ++i)
+		{
+			dist = pow(cos(DOA_hist[j]*DEG2RAD) - cos(DOA_mean[i]*DEG2RAD), 2) + pow(sin(DOA_hist[j]*DEG2RAD) - sin(DOA_mean[i]*DEG2RAD), 2);
+			if (dist < min_dist) {
+				min_dist = dist;
+				DOA_class[j] = i;
+			}
+		}
+		++class_count[ DOA_class[j] ];
+	}
+
+	for (i = 0; i < n_sources; ++i)
+	{
 		for (j = 0; j < hist_length; ++j)
 		{
 			if 	(DOA_class[j] == i) {
-				x += cos(DOA_hist[j]*DEG2RAD);
-				y += sin(DOA_hist[j]*DEG2RAD);
+				DOA_mean[i] += DOA_hist[j];
 			}
 		}
-		if (class_count[i] != 0) {
-			if (x < 0) {
-				DOA_mean[i] = atan(y/x)*RAD2DEG - 180.0;
-			} else {
-				DOA_mean[i] = atan(y/x)*RAD2DEG;
+		if (class_count[i] != 0)
+			DOA_mean[i] /= (class_count[i]+1);
+	}
+}
+
+void kmeans (double* DOA_hist, int *DOA_class, double* DOA_mean, int n_sources, int hist_length) {
+	int i, j;
+	double min_dist, dist;
+	double x, y;
+
+	for (j = 0; j < hist_length; ++j)
+	{
+		min_dist = 10; 	// a number grater than 4
+		for (i = 0; i < n_sources; ++i)
+		{
+			dist = pow(cos(DOA_hist[j]*DEG2RAD) - cos(DOA_mean[i]*DEG2RAD), 2) + pow(sin(DOA_hist[j]*DEG2RAD) - sin(DOA_mean[i]*DEG2RAD), 2);
+			if (dist < min_dist) {
+				min_dist = dist;
+				DOA_class[j] = i;
 			}
 		}
-	}*/
+	}
 }
