@@ -14,10 +14,14 @@ How to use:
 
 	$ ./gcc_beamformer <separation between microphones (meters)> <maximum number of sources to localize> <which source to filter (set to 0 to filter all)>
 
+	For example: $ ./gcc_beamformer 0.23 2 1
+
 3(a)- Use JACK to manually connect the audio sources to the corresponfing ports of 'jack_doa_beamformer' JACK client; or ...
 
 3(b)- if the audio sources are .wav files, run: 'ReadMicWavs'
 
 	$ ./ReadMicWavs <jack agent's name> <audio file root name> <audio file path> <number of channels>
+
+	For example: $ ./ReadMicWavs jack_doa_beamformer wav_mic corpus/ 3
 	
 All output files are stored in './output'. MATLAB scripts and functions in './matlab' are meant for analysis of the output files.
