@@ -15,7 +15,7 @@ double state2angle (double* state) {
 		else
 			return -90.0;
 	} else {
-		return atan(state[0]/state[1]);
+		return atan(state[0]/state[1])*RAD2DEG;
 	}
 	
 }
@@ -29,8 +29,8 @@ void angle2state (double angle, double* state) {
 		output: state (the corresponding Cartesian coordinates)
 	*/
 
-	state[0] = sin(angle);
-	state[1] = cos(angle);
+	state[0] = sin(angle*DEG2RAD);
+	state[1] = cos(angle*DEG2RAD);
 	
 }
 
