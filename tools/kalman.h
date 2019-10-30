@@ -5,7 +5,6 @@
 #include <Eigen/Dense>
 using namespace Eigen;
 
-template <typename Derived, typename OtherDerived>
-void kalman (const MatrixBase<Derived>& y, MatrixBase<OtherDerived> const & x, MatrixBase<OtherDerived> const & P);
+void kalman (double y_array[2], double *x_array, double (*P_array)[4]);
 
 #endif
