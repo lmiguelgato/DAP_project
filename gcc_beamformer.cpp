@@ -121,7 +121,11 @@ int    icounter = 0;					// number of detections
 int    ccounter = 0;					// number of cycles
 int    hist_length;						// number of cycles
 
+double **kalmanState;
+double **covMatrix;
+
 ofstream outputFile;					// save results for data analysis
+ofstream outputKalman;					// save results for data analysis
 
 /**
  * The process callback for this JACK application is called in a
@@ -263,6 +267,39 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 
 			// group similar DOAs into clusters using the k-means algorithm:
 			kmeans (DOA_hist, DOA_class, DOA_kmean, counter, n_sources, hist_length);
+
+			double measurement[2];
+			double state[4];
+			double cov[4][4];
+
+			for (i = 0; i < n_sources; ++i)
+			{
+				if (counter[i] > 0) {	// any DOA in this cluster?
+
+					if (DOA_class[icounter%hist_length] == i) {
+						angle2state (DOA_hist[icounter%hist_length], measurement);
+
+						state[0] = kalmanState[i][0];	state[1] = kalmanState[i][1];	state[2] = kalmanState[i][2];	state[3] = kalmanState[i][3];
+
+						for (j = 0; j < 4; ++j) {
+							cov[j][0] = covMatrix[4*i+j][0];	cov[j][1] = covMatrix[4*i+j][1];	cov[j][2] = covMatrix[4*i+j][2];	cov[j][3] = covMatrix[4*i+j][3];
+						}
+
+						kalman (measurement, state, cov);
+
+						outputKalman << DOA_class[icounter%hist_length] << ' ';
+						outputKalman << setprecision(2) << DOA_hist[icounter%hist_length];			// save results into text file
+						outputKalman << ' ';
+						outputKalman << setprecision(2) << state2angle (state);			// save results into text file
+						outputKalman << endl;
+
+						kalmanState[i][0] = state[0];	kalmanState[i][1] = state[1];	kalmanState[i][2] = state[2];	kalmanState[i][3] = state[3];
+						for (j = 0; j < 4; ++j) {
+							covMatrix[4*i+j][0] = cov[j][0];	covMatrix[4*i+j][1] = cov[j][1];	covMatrix[4*i+j][2] = cov[j][2];	covMatrix[4*i+j][3] = cov[j][3];
+						}
+					}
+				}	
+			}
 
 			for (i = 0; i < n_sources; ++i)
 			{
@@ -582,7 +619,7 @@ void jack_shutdown (void *arg){
 
 int main (int argc, char *argv[]) {
 
-	int i;
+	int i, j;
 
 	if(argc != 4 && argc != 3){		
 		printf ("Usage:\ndap_project d N k\nd: Microphone separation (in meters).\nN: Maximum number of sources.\nk: Which source to filter (optional parameter, the default option is filtering all sources).\n");
@@ -619,6 +656,13 @@ int main (int argc, char *argv[]) {
 	else		
 		sprintf(text_file_path, "./output/track_%d_sources.txt", n_sources);
 	outputFile.open(text_file_path);
+
+	char text_kalman_path[100];
+	if (n_sources == 1)
+		sprintf(text_kalman_path, "./output/track_%d_sourceKalman.txt", n_sources);
+	else		
+		sprintf(text_kalman_path, "./output/track_%d_sourcesKalman.txt", n_sources);
+	outputKalman.open(text_kalman_path);
 
 	dt_max = mic_separation/c;
 	N_max = dt_max*sample_rate;
@@ -676,6 +720,16 @@ int main (int argc, char *argv[]) {
 	DOA_mean	= (double *) calloc(n_sources, sizeof(double));
 	DOA_stdev	= (double *) calloc(n_sources, sizeof(double));
 	DOA_valid	= (double *) calloc(n_sources, sizeof(double));
+	kalmanState = (double **) calloc(4, sizeof(double*));
+	covMatrix   = (double **) calloc(4*n_sources, sizeof(double*));
+
+	for (i = 0; i < 4; ++i) {
+		kalmanState[i] = (double *) calloc(n_sources, sizeof(double));
+		for (j = 0; j < n_sources; ++j) {
+			covMatrix[j*4+i] = (double *) calloc(4, sizeof(double));
+		}
+	}
+
 	counter		= (int *) calloc(n_sources, sizeof(int));
 	dcounter	= (int *) calloc(n_sources, sizeof(int));
 	ecounter	= (int *) calloc(n_sources, sizeof(int));
@@ -845,5 +899,6 @@ int main (int argc, char *argv[]) {
 	jack_client_close (client);
 	//sf_close(audio_file);
 	outputFile.close();
+	outputKalman.close();
 	exit (0);
 }
