@@ -47,7 +47,7 @@ using namespace std;
 #define RAD2DEG 57.295779513082323f		// useful to convert from radians to degrees
 #define GCC_STYLE 4						// 1: GCC, 2:GCC (frequency restrained), 3:GCC-PHAT, 4:GCC-PHAT (frequency restrained)
 #define GCC_TH 120.0f					// correlation threshold (to avoid false alarms)
-#define REDUNDANCY_TH 10.0f				// redundancy threshold (for DOA estimation)
+#define REDUNDANCY_TH 15.0f				// redundancy threshold (for DOA estimation)
 #define DYNAMIC_GCC_TH 1				// enable a dynamic GCC threshold (0: disabled, 1: mean peak values, 2: max peak values)
 #define MOVING_AVERAGE 1				// enable a moving average on kmeans centroids (0: disabled, 1: finite memory, 2: infinite memory)
 #define MOVING_FACTOR 4					// allow variations in DOA if the sources are moving (how many times the standard deviation)
@@ -226,7 +226,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 
 			if (max_mean > 1.0) {
 				++ccounter;
-				gcc_th = (gcc_th*(ccounter-1) + max_mean)/ccounter;
+				gcc_th = (gcc_th*ccounter + max_mean)/(ccounter+1);
 			}
 		break;
 
@@ -274,12 +274,12 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 
 			for (i = 0; i < n_sources; ++i)
 			{
-				if (counter[i] > 0) {	// any DOA in this cluster?
+				//if (counter[i] > 0) {	// any DOA in this cluster?
 
 					if (DOA_class[icounter%hist_length] == i) {
 						angle2state (DOA_hist[icounter%hist_length], measurement);
 
-						state[0] = kalmanState[i][0];	state[1] = kalmanState[i][1];	state[2] = kalmanState[i][2];	state[3] = kalmanState[i][3];
+						state[0] = kalmanState[0][i];	state[1] = kalmanState[1][i];	state[2] = kalmanState[2][i];	state[3] = kalmanState[3][i];
 
 						for (j = 0; j < 4; ++j) {
 							cov[j][0] = covMatrix[4*i+j][0];	cov[j][1] = covMatrix[4*i+j][1];	cov[j][2] = covMatrix[4*i+j][2];	cov[j][3] = covMatrix[4*i+j][3];
@@ -293,12 +293,12 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 						outputKalman << setprecision(2) << state2angle (state);			// save results into text file
 						outputKalman << endl;
 
-						kalmanState[i][0] = state[0];	kalmanState[i][1] = state[1];	kalmanState[i][2] = state[2];	kalmanState[i][3] = state[3];
+						kalmanState[0][i] = state[0];	kalmanState[1][i] = state[1];	kalmanState[2][i] = state[2];	kalmanState[3][i] = state[3];
 						for (j = 0; j < 4; ++j) {
 							covMatrix[4*i+j][0] = cov[j][0];	covMatrix[4*i+j][1] = cov[j][1];	covMatrix[4*i+j][2] = cov[j][2];	covMatrix[4*i+j][3] = cov[j][3];
 						}
 					}
-				}	
+				//}	
 			}
 
 			for (i = 0; i < n_sources; ++i)
@@ -723,13 +723,6 @@ int main (int argc, char *argv[]) {
 	kalmanState = (double **) calloc(4, sizeof(double*));
 	covMatrix   = (double **) calloc(4*n_sources, sizeof(double*));
 
-	for (i = 0; i < 4; ++i) {
-		kalmanState[i] = (double *) calloc(n_sources, sizeof(double));
-		for (j = 0; j < n_sources; ++j) {
-			covMatrix[j*4+i] = (double *) calloc(4, sizeof(double));
-		}
-	}
-
 	counter		= (int *) calloc(n_sources, sizeof(int));
 	dcounter	= (int *) calloc(n_sources, sizeof(int));
 	ecounter	= (int *) calloc(n_sources, sizeof(int));
@@ -747,6 +740,29 @@ int main (int argc, char *argv[]) {
 		}
 		//DOA_kmean[i] = distribution(generator);	// random initialization for the k-means algorithm
 		DOA_stdev[i] = 360.0/2.0/n_sources;
+	}
+
+	for (i = 0; i < 4; ++i) {
+		kalmanState[i] = (double *) calloc(n_sources, sizeof(double));
+		for (j = 0; j < n_sources; ++j) {
+			covMatrix[j*4+i] = (double *) calloc(4, sizeof(double));
+		}
+	}
+
+	// initialize Kalman state:
+	double initialState[2];
+	for (i = 0; i < n_sources; ++i) {
+		angle2state(DOA_kmean[i], initialState);
+
+		kalmanState[0][i] = initialState[0];
+		kalmanState[1][i] = initialState[1];
+		
+		/*
+		covMatrix[i*4+0][0] = 0.000002493289818;	covMatrix[i*4+0][2] = 0.000116781724500;
+		covMatrix[i*4+1][1] = 0.000002493289818;	covMatrix[i*4+1][3] = 0.000116781724500;
+		covMatrix[i*4+2][0] = 0.000116781724500;	covMatrix[i*4+2][2] = 0.005469870000000;
+		covMatrix[i*4+3][1] = 0.000116781724500;	covMatrix[i*4+3][3] = 0.005469870000000;
+		*/
 	}
 
 
