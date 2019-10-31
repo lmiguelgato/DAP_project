@@ -9,13 +9,24 @@ double state2angle (double* state) {
 		output: (the corresponding angle)
 	*/
 
-	if (state[1] == 0.0) {
+	if (abs(state[1]) <= 0.001) {
 		if (state[0] >= 0.0)
 			return 90.0;
 		else
 			return -90.0;
 	} else {
-		return atan(state[0]/state[1])*RAD2DEG;
+		if (state[1] >= 0) {
+			return atan(state[0]/state[1])*RAD2DEG;
+		} else {	
+			if (state[0] > 0) {
+				return atan(state[0]/state[1])*RAD2DEG + 180.0;
+			} else {
+				if (state[0] < 0)
+					return atan(state[0]/state[1])*RAD2DEG - 180.0;
+				else
+					return 180.0;
+			}
+		}
 	}
 	
 }
