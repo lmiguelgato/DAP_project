@@ -1,8 +1,10 @@
 #include "kalman.h"
 
-#define TAU 0.0427	// 2048/48000: observation time
-#define ACC 1.0		// modeled acceleration
-#define NVAR 0.001	// measurement noise variance
+#define TAU 0.0213333	// 1024/48000: observation time
+#define ACC 1.0			// modeled acceleration
+#define NVAR 0.005	// measurement noise variance
+//#define ACC 0.05		// modeled acceleration
+//#define NVAR 0.000001	// measurement noise variance
 
 // state transition model:
 const MatrixXd F = (MatrixXd(4,4) << 1.0, 0.0, TAU, 0.0, 0.0, 1.0, 0.0, TAU, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0).finished();
