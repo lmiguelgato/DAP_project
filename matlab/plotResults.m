@@ -4,7 +4,7 @@ clc
 
 addpath('../output')
 
-max_num_sources = 3;
+max_num_sources = 4;
 
 if max_num_sources == 1
     filename = strcat('track_', num2str(max_num_sources), '_source');
@@ -81,26 +81,26 @@ for i = 1:max_num_sources
 end
 legend(labels)
 
-% figure
-% for j = 1:max_num_sources
-%     if ~isnan(meanDOAs(j)) && ~isnan(stdevDOAs(j))
-%         tmp = exp(1i*[meanDOAs(j) - stdevDOAs(j) meanDOAs(j) meanDOAs(j) + stdevDOAs(j)]/180*pi);
-%         polarplot(tmp,':','LineWidth',ceil(8*percentDOAs(j)/100));
-%         hold on;
-%         text(imag(tmp(2)),real(tmp(2)),[num2str(round(percentDOAs(j))) ' %'])
-%     end
-% end
-% polarplot(0.1*exp(1i*[-60 60 180 -60]/180*pi),'k','LineWidth',2);
-%     
-% for j = 1:max_num_sources
-%     hold on;
-%     polarplot([0.9*exp(1i*(meanDOAs(j) - stdevDOAs(j))/180*pi) 1.1*exp(1i*(meanDOAs(j) - stdevDOAs(j))/180*pi)],'k');
-%     hold on;
-%     polarplot([0.9*exp(1i*(meanDOAs(j) + stdevDOAs(j))/180*pi) 1.1*exp(1i*(meanDOAs(j) + stdevDOAs(j))/180*pi)],'k');
-% end
-% 
-% ax = gca;
-% ax.ThetaLim = [-180 180];
-% ax.RTickLabel = {''};
-% ax.ThetaZeroLocation = 'top';
-% ax.ThetaDir = 'clockwise';
+figure
+for j = 1:max_num_sources
+    if ~isnan(meanDOAs(j)) && ~isnan(stdevDOAs(j))
+        tmp = exp(1i*[meanDOAs(j) - stdevDOAs(j) meanDOAs(j) meanDOAs(j) + stdevDOAs(j)]/180*pi);
+        polarplot(tmp,':','LineWidth',ceil(8*percentDOAs(j)/100));
+        hold on;
+        text(imag(tmp(2)),real(tmp(2)),[num2str(round(percentDOAs(j))) ' %'])
+    end
+end
+polarplot(0.1*exp(1i*[-60 60 180 -60]/180*pi),'k','LineWidth',2);
+    
+for j = 1:max_num_sources
+    hold on;
+    polarplot([0.9*exp(1i*(meanDOAs(j) - stdevDOAs(j))/180*pi) 1.1*exp(1i*(meanDOAs(j) - stdevDOAs(j))/180*pi)],'k');
+    hold on;
+    polarplot([0.9*exp(1i*(meanDOAs(j) + stdevDOAs(j))/180*pi) 1.1*exp(1i*(meanDOAs(j) + stdevDOAs(j))/180*pi)],'k');
+end
+
+ax = gca;
+ax.ThetaLim = [-180 180];
+ax.RTickLabel = {''};
+ax.ThetaZeroLocation = 'top';
+ax.ThetaDir = 'clockwise';
