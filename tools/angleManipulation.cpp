@@ -48,50 +48,86 @@ void angle2state (double angle, double* state) {
 double angleRedundancy (double* theta, double* thetaRedundant, double Ethresh) {
 	int i, j, k;
 	double theta12, theta23, theta31;
-	double Epqr;
-	double minEpqr = 1000;
+	double Epqr, minAngleDiff;
+	double minEpqr = 100000;
 	double doa;
+	double xy_1[2];
+	double xy_2[2];
+	double xy_diff[2];
+	double measurement[2];
 	bool found = false;
 
 	for (i = 0; i < 2; ++i)	{
-		theta12 = theta[i];
+		theta12 = theta[i*3];
 		for (j = 0; j < 2; ++j)	{
-			theta23 = theta[2+i];
+			theta23 = theta[1+j*3];
 			for (k = 0; k < 2; ++k)	{
-				theta31 = theta[4+i];
-				Epqr = (abs(theta12-theta23) + abs(theta23-theta31) + abs(theta31-theta12))/3.0;
+				theta31 = theta[2+k*3];
+
+				angle2state (theta12, xy_1);
+				angle2state (theta23, xy_2);
+
+				xy_diff[0] = xy_1[0]-xy_2[0];
+				xy_diff[1] = xy_1[1]-xy_2[1];
+
+				Epqr = xy_diff[0]*xy_diff[0] + xy_diff[1]*xy_diff[1];
 				if (Epqr < minEpqr)
 				{
 					minEpqr = Epqr;
-					thetaRedundant[0] = theta12;
-					thetaRedundant[1] = theta23;
-					thetaRedundant[2] = theta31;
+					minAngleDiff = abs(theta12-theta23);
+
+					if (minAngleDiff <= Ethresh) {
+						found = true;
+						doa = (theta12+theta23)/2;
+					}
+					if (minAngleDiff >= (360.0-Ethresh)) {
+						found = true;
+						doa = (abs(theta12)+abs(theta23))/2;
+					}
+					
+				}
+
+				angle2state (theta31, xy_1);
+
+				xy_diff[0] = xy_1[0]-xy_2[0];
+				xy_diff[1] = xy_1[1]-xy_2[1];
+
+				Epqr = xy_diff[0]*xy_diff[0] + xy_diff[1]*xy_diff[1];
+				if (Epqr < minEpqr)
+				{
+					minEpqr = Epqr;
+					minAngleDiff = abs(theta31-theta23);
+					if (minAngleDiff <= Ethresh) {
+						found = true;
+						doa = (theta31+theta23)/2;
+					}
+					if (minAngleDiff >= (360.0-Ethresh)) {
+						found = true;
+						doa = (abs(theta31)+abs(theta23))/2;
+					}
+				}
+
+				angle2state (theta12, xy_2);
+
+				xy_diff[0] = xy_1[0]-xy_2[0];
+				xy_diff[1] = xy_1[1]-xy_2[1];
+
+				Epqr = xy_diff[0]*xy_diff[0] + xy_diff[1]*xy_diff[1];
+				if (Epqr < minEpqr)
+				{
+					minEpqr = Epqr;
+					minAngleDiff = abs(theta31-theta12);
+					if (minAngleDiff <= Ethresh) {
+						found = true;
+						doa = (theta12+theta31)/2;
+					}
+					if (minAngleDiff >= (360.0-Ethresh)) {
+						found = true;
+						doa = (abs(theta12)+abs(theta31))/2;
+					}
 				}
 			}
 		}
-	}
-
-
-
-	minEpqr = Ethresh;
-	Epqr = abs(thetaRedundant[0]-thetaRedundant[1]);
-	if (Epqr < minEpqr) {
-		doa = (thetaRedundant[0]+thetaRedundant[1])/2.0;
-		minEpqr = Epqr;
-		found = true;
-	}
-
-	Epqr = abs(thetaRedundant[1]-thetaRedundant[2]);
-	if (Epqr < minEpqr) {
-		doa = (thetaRedundant[1]+thetaRedundant[2])/2.0;
-		minEpqr = Epqr;
-		found = true;
-	}
-
-	Epqr = abs(thetaRedundant[2]-thetaRedundant[0]);
-	if (Epqr < minEpqr) {
-		doa = (thetaRedundant[2]+thetaRedundant[0])/2.0;
-		found = true;
 	}
 
 	if (!found) 	doa = 181.0;
