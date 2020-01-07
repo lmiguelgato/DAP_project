@@ -1,0 +1,18 @@
+#!/bin/bash
+
+jack_module_pid_file="$HOME/jack_module_PIDs"
+
+touch $jack_module_pid_file
+
+exec<$jack_module_pid_file
+
+if read line
+	then pactl unload-module $line;
+fi
+   
+if read line
+	then pactl unload-module $line;
+fi
+
+rm $jack_module_pid_file
+

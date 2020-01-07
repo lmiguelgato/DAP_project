@@ -1,0 +1,10 @@
+#!/bin/bash
+
+jack_module_pid_file="$HOME/jack_module_PIDs"
+
+pactl load-module module-jack-sink > $jack_module_pid_file
+pactl load-module module-jack-source >> $jack_module_pid_file
+
+pacmd set-default-sink "jack_out"
+pacmd set-default-source "jack_in"
+
