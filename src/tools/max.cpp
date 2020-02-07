@@ -22,3 +22,14 @@ int max (std::complex<double> *signal, int signal_length, int Nmax, double *max_
 
 	return max_index;
 }
+
+double mean (double* array, int length) {
+	double thisMean = 0;
+	double dlength = (double) length;
+
+	for (int i = 0; i < length; ++i) {
+		thisMean += array[i];
+	}
+
+	return thisMean/dlength;
+}

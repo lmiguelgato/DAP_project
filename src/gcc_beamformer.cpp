@@ -46,12 +46,12 @@ using namespace std;
 
 #define RAD2DEG 57.295779513082323f		// useful to convert from radians to degrees
 #define GCC_STYLE 4						// 1: GCC, 2:GCC (frequency restrained), 3:GCC-PHAT, 4:GCC-PHAT (frequency restrained)
-#define GCC_TH 120.0f					// correlation threshold (to avoid false alarms)
-#define REDUNDANCY_TH 15.0f				// redundancy threshold (for DOA estimation)
+#define GCC_TH 100.0f					// correlation threshold (to avoid false alarms)
+#define REDUNDANCY_TH 20.0f				// redundancy threshold (for DOA estimation)
 #define DYNAMIC_GCC_TH 1				// enable a dynamic GCC threshold (0: disabled, 1: mean peak values, 2: max peak values)
 #define MOVING_AVERAGE 1				// enable a moving average on kmeans centroids (0: disabled, 1: finite memory, 2: infinite memory)
-#define MOVING_FACTOR 4					// allow variations in DOA if the sources are moving (how many times the standard deviation)
-#define MEMORY_FACTOR 10				// memory of the k-means algorithm
+#define MOVING_FACTOR 1					// allow variations in DOA if the sources are moving (how many times the standard deviation)
+#define MEMORY_FACTOR 5				// memory of the k-means algorithm
 #define VERBOSE false					// display additional information
 
 // JACK:
@@ -120,6 +120,7 @@ int    *ecounter;						// number of smoothed valid DOAs
 int    icounter = 0;					// number of detections
 int    ccounter = 0;					// number of cycles
 int    hist_length;						// number of cycles
+bool   firstDetection = true;
 
 double **kalmanState;
 double **covMatrix;
@@ -178,7 +179,7 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 			X_gcc[j][i] = i_fft_2N[i];
 	}
 
-	// 3- multiply pairs of FFTs (time reversing one them), and
+	// 3- multiply pairs of FFTs (time reversing one of them), and
 	// 4- apply iFFT
 	phat (o_fft_2N, X_gcc[0], X_gcc[1], window_size_2, kmin, kmax, GCC_STYLE);
 	fftw_execute(o_inverse_2N);
@@ -224,9 +225,10 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		case 1:	// mean peak values
 			max_mean = (max_val12 + max_val23 + max_val31)/3;
 
-			if (max_mean > 1.0) {
+			if (max_mean > GCC_TH) {
 				++ccounter;
-				gcc_th = (gcc_th*ccounter + max_mean)/(ccounter+1);
+				//gcc_th = (gcc_th*ccounter + max_mean)/(ccounter+1);
+				gcc_th = max_mean;
 			}
 		break;
 
@@ -264,6 +266,32 @@ int jack_callback (jack_nframes_t nframes, void *arg){
 		++icounter;
 
 		if (icounter >= hist_length) {	// is the shift register full?
+
+			if (icounter == hist_length && firstDetection) {
+				firstDetection = false;
+
+				DOA_kmean[0] = mean(DOA_hist, hist_length);
+				
+				for (i = 1; i < n_sources; ++i)
+				{
+					DOA_kmean[i] = doa + 360.0/n_sources*i;		
+
+					if (DOA_kmean[i] > 180.0) {
+						DOA_kmean[i] -= 360.0;
+					}
+				}
+
+				// initialize Kalman state:
+				double initialThisState[2];
+				for (i = 0; i < n_sources; ++i) {
+					angle2state(DOA_kmean[i], initialThisState);
+
+					kalmanState[0][i] = initialThisState[0];
+					kalmanState[1][i] = initialThisState[1];
+
+					printf("kalman initialization[%d]: %1.1f\n", i, DOA_kmean[i]);
+				}
+			}
 
 			// group similar DOAs into clusters using the k-means algorithm:
 			kmeans (DOA_hist, DOA_class, DOA_kmean, counter, n_sources, hist_length);
