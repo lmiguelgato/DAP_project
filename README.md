@@ -4,6 +4,11 @@ Final project of "Digital Audio Processing" (robotic audition)
 - Estimate the directions of arrival (DOA) of multiple speakers from a set of recordings.
 - Spatial filtering to improve the signal-to-interference ratio.
 
+Requirements:
+- libsndfile (version 1.0.28 or higher)
+- fftw (version 3.3.8 or higher)
+- Eigen (version 3.3.7 or higher)
+
 How to use:
 
 1	- For compilation, run: 'make'.
