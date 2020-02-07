@@ -1,0 +1,23 @@
+{
+    "files.associations": {
+        "*.tpp": "cpp",
+        "*.tcc": "c",
+        "random": "c",
+        "limits": "c",
+        "functional": "c",
+        "liquid.internal.h": "c",
+        "liquid.h": "c",
+        "libsonicdata.h": "c",
+        "inttypes.h": "c",
+        "array": "cpp",
+        "chrono": "cpp",
+        "istream": "cpp",
+        "ostream": "cpp",
+        "ratio": "cpp",
+        "tuple": "cpp",
+        "type_traits": "cpp",
+        "utility": "cpp"
+    },
+    "terminal.integrated.shell.windows": "cmd.exe",
+    "git.ignoreLimitWarning": true
+}
