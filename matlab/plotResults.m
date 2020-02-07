@@ -7,7 +7,7 @@ folder = uigetdir('.', ...
 
 addpath(folder)
 
-enableML = 0;
+enableML = 1;
 max_num_sources = 3;
 
 if max_num_sources == 1
