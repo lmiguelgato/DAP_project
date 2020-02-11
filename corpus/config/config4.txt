@@ -1,0 +1,104 @@
+sst.json";
+        };
+	};
+
+};
+
+sss:
+{
+    
+    # Separation mode is either "dds" or "dgss"
+    # Post-filtering mode is either "ms" or "ss"
+
+    mode_sep = "dds";
+    mode_pf = "ss";
+
+    gain_sep = 1.0;
+    gain_pf = 10.0;
+
+    dds: {
+
+    };
+
+    dgss: {
+
+        mu = 0.01;
+        lambda = 0.5;
+
+    };
+
+    dmvdr: {
+
+    };
+
+    ms: {
+
+        alphaPmin = 0.07;
+        eta = 0.5;
+        alphaZ = 0.8;        
+        thetaWin = 0.3;
+        alphaWin = 0.3;
+        maxAbsenceProb = 0.9;
+        Gmin = 0.01;
+        winSizeLocal = 3;
+        winSizeGlobal = 23;
+        winSizeFrame = 256;
+
+    };
+
+    ss: {
+
+        Gmin = 0.01;
+        Gmid = 0.9;
+        Gslope = 10.0;
+
+    }
+
+    separated: {
+  		fS = 48000;
+  		hopSize = 512;
+  		nBits = 16;        
+
+  		interface: {
+            type = "blackhole";
+            path = "separated.raw";
+        };      
+	};
+
+    postfiltered: {
+  		fS = 48000;
+  		hopSize = 512;
+  		nBits = 16;        
+
+  		interface: {
+            type = "blackhole";
+            path = "postfiltered.raw";
+        };        
+	};
+
+};
+
+classify:
+{
+    
+    frameSize = 4096;
+    winSize = 3;
+    tauMin = 88;
+    tauMax = 551;
+    deltaTauMax = 20;
+    alpha = 0.3;
+    gamma = 0.05;
+    phiMin = 0.5;
+    r0 = 0.2;    
+
+    category: {
+
+        format = "undefined";
+
+        interface: {
+            type = "blackhole";
+        };
+
+    };
+
+};

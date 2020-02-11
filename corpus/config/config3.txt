@@ -1,0 +1,74 @@
+ssl.json";
+        };
+	};
+
+};
+
+sst:
+{  
+
+    # Mode is either "kalman" or "particle"
+
+    mode = "kalman";
+
+    # Add is either "static" or "dynamic"
+
+    add = "dynamic";
+
+    # Parameters used by both the Kalman and particle filter
+
+    active = (
+        { weight = 1.0; mu = 0.3; sigma2 = 0.0025 }
+    );
+
+    inactive = (
+        { weight = 1.0; mu = 0.15; sigma2 = 0.0025 }
+    );
+
+    sigmaR2_prob = 0.0025;
+    sigmaR2_active = 0.0225;
+    sigmaR2_target = 0.0025;
+    Pfalse = 0.1;
+    Pnew = 0.1;
+    Ptrack = 0.8;
+
+    theta_new = 0.9;
+    N_prob = 5;
+    theta_prob = 0.8;
+    N_inactive = ( 150, 200, 250, 250 );
+    theta_inactive = 0.9;
+
+    # Parameters used by the Kalman filter only
+
+    kalman: {
+
+        sigmaQ = 0.001;
+        
+    };
+   
+    # Parameters used by the particle filter only
+
+    particle: {
+
+        nParticles = 1000;
+        st_alpha = 2.0;
+        st_beta = 0.04;
+        st_ratio = 0.5;
+        ve_alpha = 0.05;
+        ve_beta = 0.2;
+        ve_ratio = 0.3;
+        ac_alpha = 0.5;
+        ac_beta = 0.2;
+        ac_ratio = 0.2;
+        Nmin = 0.7;
+
+    };
+
+    target: ();
+
+    # Output to export tracked sources
+    tracked: {
+  		format = "json";
+  		interface: {
+            type = "file";
+            path = "

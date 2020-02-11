@@ -27,21 +27,9 @@
 *.out
 *.app
 
-pda_project
-
-corpus/
-
 *.wav
 
-ReadMicWavs
-
-dap_project
-
 output/
-
-gcc_beamformer
-
-beamformer
 
 *.snm
 
@@ -64,3 +52,5 @@ doc/beamer/main_beamer\.pdf
 doc/figures/vect/
 
 doc/main_beamer\.pdf
+
+bin/

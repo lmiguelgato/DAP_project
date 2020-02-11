@@ -1,0 +1,11 @@
+raw: 
+{
+
+    fS = 48000;
+    hopSize = 512;
+    nBits = 16;
+    nChannels = 8; 
+
+    interface: {
+        type = "file";
+        path = "

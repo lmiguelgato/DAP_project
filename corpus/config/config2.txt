@@ -1,0 +1,216 @@
+8mics.raw";      
+    };
+
+};
+
+mapping:
+{
+    map: (1,2,3,4,5,6,7,8);
+};
+
+general:
+{    
+    epsilon = 1E-20;
+
+    size: 
+    {
+        hopSize = 128;
+        frameSize = 256;
+    };
+    
+    samplerate:
+    {
+        mu = 16000;
+        sigma2 = 0.01;
+    };
+
+    speedofsound:
+    {
+        mu = 343.0;
+        sigma2 = 25.0;
+    };
+
+    mics = (
+        
+        # Microphone 1
+        { 
+            mu = ( +0.158, +0.115, +0.000 ); 
+            sigma2 = ( 0.0, 0.0, 0.0, 0.0, +1E-6, 0.0, 0.0, 0.0, +1E-6 );
+            direction = ( +0.000, +0.000, +1.000 );
+            angle = ( 80.0, 100.0 );
+        },
+
+        # Microphone 2
+        { 
+            mu = ( +0.158, -0.115, +0.000 ); 
+            sigma2 = ( 0.0, 0.0, 0.0, 0.0, +1E-6, 0.0, 0.0, 0.0, +1E-6 );
+            direction = ( +0.000, +0.000, +1.000 );
+            angle = ( 80.0, 100.0 );
+        },
+
+        # Microphone 3
+        { 
+            mu = ( -0.045, +0.000, +0.000 ); 
+            sigma2 = ( 0.0, 0.0, 0.0, 0.0, +1E-6, 0.0, 0.0, 0.0, +1E-6 );
+            direction = ( +0.000, +0.000, +1.000 );
+            angle = ( 80.0, 100.0 );
+        },
+
+        # Microphone 4
+        { 
+            mu = ( -0.050, -0.188, +0.000 ); 
+            sigma2 = ( 0.0, 0.0, 0.0, 0.0, +1E-6, 0.0, 0.0, 0.0, +1E-6 );
+            direction = ( +0.000, +0.000, +1.000 );
+            angle = ( 80.0, 100.0 );
+        },
+
+        # Microphone 5
+        { 
+            mu = ( -0.195, +0.000, +0.000 ); 
+            sigma2 = ( +1E-6, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, +1E-6 );
+            direction = ( +0.000, +0.000, +1.000 );
+            angle = ( 80.0, 100.0 );
+        },
+
+        # Microphone 6
+        { 
+            mu = ( -0.057, +0.186, +0.000 ); 
+            sigma2 = ( +1E-6, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, +1E-6 );
+            direction = ( +0.000, +0.000, +1.000 );
+            angle = ( 80.0, 100.0 );
+        },
+
+        # Microphone 7
+        { 
+            mu = ( +0.180, +0.000, -0.168 ); 
+            sigma2 = ( +1E-6, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, +1E-6 );
+            direction = ( +1.000, +0.000, +0.000 );
+            angle = ( 80.0, 100.0 );
+        },
+
+        # Microphone 8
+        { 
+            mu = ( +0.158, -0.115, -0.335 ); 
+            sigma2 = ( +1E-6, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, +1E-6 );
+            direction = ( +0.707, -0.707, +0.000 );
+            angle = ( 80.0, 100.0 );
+        },
+
+        # Microphone 9
+        { 
+            mu = ( +0.056, -0.171, -0.168 ); 
+            sigma2 = ( 0.0, 0.0, 0.0, 0.0, +1E-6, 0.0, 0.0, 0.0, +1E-6 );
+            direction = ( +0.500, -0.866, +0.000 );
+            angle = ( 80.0, 100.0 );
+        },
+
+        # Microphone 10
+        { 
+            mu = ( -0.050, -0.188, -0.335 ); 
+            sigma2 = ( 0.0, 0.0, 0.0, 0.0, +1E-6, 0.0, 0.0, 0.0, +1E-6 );
+            direction = ( -0.500, -0.866, +0.000 );
+            angle = ( 80.0, 100.0 );
+        },
+
+        # Microphone 11
+        { 
+            mu = ( -0.128, -0.098, -0.168 ); 
+            sigma2 = ( 0.0, 0.0, 0.0, 0.0, +1E-6, 0.0, 0.0, 0.0, +1E-6 );
+            direction = ( -0.707, -0.707, +0.000 );
+            angle = ( 80.0, 100.0 );
+        },        
+
+        # Microphone 12
+        { 
+            mu = ( -0.195, +0.000, -0.335 ); 
+            sigma2 = ( 0.0, 0.0, 0.0, 0.0, +1E-6, 0.0, 0.0, 0.0, +1E-6 );
+            direction = ( -1.000, +0.000, +0.000 );
+            angle = ( 80.0, 100.0 );
+        },         
+
+        # Microphone 13
+        { 
+            mu = ( -0.132, +0.098, -0.168 ); 
+            sigma2 = ( 0.0, 0.0, 0.0, 0.0, +1E-6, 0.0, 0.0, 0.0, +1E-6 );
+            direction = ( +0.707, -0.707, +0.000 );
+            angle = ( 80.0, 100.0 );
+        },  
+
+        # Microphone 14
+        { 
+            mu = ( -0.057, +0.186, -0.335 ); 
+            sigma2 = ( 0.0, 0.0, 0.0, 0.0, +1E-6, 0.0, 0.0, 0.0, +1E-6 );
+            direction = ( -0.500, +0.866, +0.000 );
+            angle = ( 80.0, 100.0 );
+        },       
+
+        # Microphone 15
+        { 
+            mu = ( +0.056, +0.171, -0.168 ); 
+            sigma2 = ( 0.0, 0.0, 0.0, 0.0, +1E-6, 0.0, 0.0, 0.0, +1E-6 );
+            direction = ( +0.500, +0.866, +0.000 );
+            angle = ( 80.0, 100.0 );
+        },  
+
+        # Microphone 16
+        { 
+            mu = ( +0.158, +0.115, -0.335 ); 
+            sigma2 = ( 0.0, 0.0, 0.0, 0.0, +1E-6, 0.0, 0.0, 0.0, +1E-6 );
+            direction = ( +0.707, +0.707, +0.000 );
+            angle = ( 80.0, 100.0 );
+        }  
+        
+    );
+
+    # Spatial filter to include only a range of direction if required
+    # (may be useful to remove false detections from the floor)
+    spatialfilters: (
+
+        {
+            direction = ( +0.000, +0.000, +1.000 );
+            angle = (80.0, 90.0);
+        }
+
+    );
+
+    nThetas = 181;
+    gainMin = 0.25;
+
+};
+
+# Stationnary noise estimation
+
+sne:
+{
+    b = 3;
+    alphaS = 0.1;
+    L = 150;
+    delta = 3.0;
+    alphaD = 0.1;
+};
+
+# Sound Source Localization
+
+ssl:
+{
+
+    nPots = 4;
+    nMatches = 10;
+    probMin = 0.3;
+    nRefinedLevels = 1;
+    interpRate = 1;
+
+    # Number of scans: level is the resolution of the sphere
+    # and delta is the size of the maximum sliding window
+    # (delta = -1 means the size is automatically computed)
+    scans = (
+        { level = 2; delta = -1; },
+        { level = 4; delta = -1; }
+    );
+
+    # Output to export potential sources
+    potential: {
+        format = "json";
+        interface: {
+            type = "file";
+            path = "
