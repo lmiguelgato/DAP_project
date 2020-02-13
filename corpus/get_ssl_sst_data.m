@@ -6,7 +6,7 @@ addpath('jsonlab')
 main_path = '/home/lmiguelgato/Documents/DAP_project/corpus';
 
 files = dir();
-dirFlags = [files.isdir] & ~strcmp({files.name},'.') & ~strcmp({files.name},'..');
+dirFlags = [files.isdir] & ~strcmp({files.name},'.') & ~strcmp({files.name},'..') & ~strcmp({files.name},'jsonlab') & ~strcmp({files.name},'config');
 subFolders = files(dirFlags);
 
 progress = 0;
