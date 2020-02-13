@@ -54,3 +54,11 @@ doc/figures/vect/
 doc/main_beamer\.pdf
 
 bin/
+
+corpus/Anechoic_Chamber_16/
+
+corpus/Cafeteria_16/
+
+corpus/Department_Store_16/
+
+corpus/Office_A_16/
