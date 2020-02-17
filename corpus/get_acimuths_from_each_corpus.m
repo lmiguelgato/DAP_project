@@ -59,6 +59,7 @@ for k = 1 : length(subFolders)
             total_detections_E5 = 0;
             total_detections_E10 = 0;
             total_detections_E15 = 0;
+            n_missed_detections = 0;
       
           for isources = 1:nsources
             E5 = find(abs(theta_ssl*180/pi-theta_original(isources)) < max_abs_error_E5);
@@ -89,17 +90,34 @@ for k = 1 : length(subFolders)
                     fprintf(fileID,'mean absolute error up to %u degrees in error: %6.2f\n', max_abs_error_E10, mean(abs(theta_original(isources)-theta_ssl(E10)*180/pi)));
                     fprintf(fileID,'RMS error up to %u degrees in error: %6.2f\n', max_abs_error_E10, sqrt(sum((theta_original(isources)-theta_ssl(E10)*180/pi).^2)/length(E10)));
                     fprintf(fileID,'------------------------\n');
-                end
-
-                if ~isempty(E5)
-                    num_detections_E5 = num_detections_E5 + length(E5);
-                    num_detections_E10 = num_detections_E10 - num_detections_E5;                
                     
-                    fprintf(fileID,'number of detections up to %u degrees in error: %u\n', max_abs_error_E5, length(E5));
-                    fprintf(fileID,'mean detection up to %u degrees in error: %6.2f\n', max_abs_error_E5, mean(theta_ssl(E5)*180/pi));
-                    fprintf(fileID,'mean absolute error up to %u degrees in error: %6.2f\n', max_abs_error_E5, mean(abs(theta_original(isources)-theta_ssl(E5)*180/pi)));
-                    fprintf(fileID,'RMS error up to %u degrees in error: %6.2f\n', max_abs_error_E5, sqrt(sum((theta_original(isources)-theta_ssl(E5)*180/pi).^2)/length(E5)));
+                    if ~isempty(E5)
+                        num_detections_E5 = num_detections_E5 + length(E5);
+                        num_detections_E10 = num_detections_E10 - num_detections_E5;                
 
+                        fprintf(fileID,'number of detections up to %u degrees in error: %u\n', max_abs_error_E5, length(E5));
+                        fprintf(fileID,'mean detection up to %u degrees in error: %6.2f\n', max_abs_error_E5, mean(theta_ssl(E5)*180/pi));
+                        fprintf(fileID,'mean absolute error up to %u degrees in error: %6.2f\n', max_abs_error_E5, mean(abs(theta_original(isources)-theta_ssl(E5)*180/pi)));
+                        fprintf(fileID,'RMS error up to %u degrees in error: %6.2f\n', max_abs_error_E5, sqrt(sum((theta_original(isources)-theta_ssl(E5)*180/pi).^2)/length(E5)));
+
+                        fprintf(fileID,'------------------------\n');
+                    else
+                        fprintf(fileID,'number of detections up to %u degrees in error: %u\n', max_abs_error_E5, 0);
+                        fprintf(fileID,'mean detection up to %u degrees in error: %6.2f\n', max_abs_error_E5, 0);
+                        fprintf(fileID,'mean absolute error up to %u degrees in error: %6.2f\n', max_abs_error_E5, -1);
+                        fprintf(fileID,'RMS error up to %u degrees in error: %6.2f\n', max_abs_error_E5, -1);
+                        fprintf(fileID,'------------------------\n');
+                    end
+                else
+                    fprintf(fileID,'number of detections up to %u degrees in error: %u\n', max_abs_error_E10, 0);
+                    fprintf(fileID,'mean detection up to %u degrees in error: %6.2f\n', max_abs_error_E10, 0);
+                    fprintf(fileID,'mean absolute error up to %u degrees in error: %6.2f\n', max_abs_error_E10, -1);
+                    fprintf(fileID,'RMS error up to %u degrees in error: %6.2f\n', max_abs_error_E10, -1);
+                    fprintf(fileID,'------------------------\n');
+                    fprintf(fileID,'number of detections up to %u degrees in error: %u\n', max_abs_error_E5, 0);
+                    fprintf(fileID,'mean detection up to %u degrees in error: %6.2f\n', max_abs_error_E5, 0);
+                    fprintf(fileID,'mean absolute error up to %u degrees in error: %6.2f\n', max_abs_error_E5, -1);
+                    fprintf(fileID,'RMS error up to %u degrees in error: %6.2f\n', max_abs_error_E5, -1);
                     fprintf(fileID,'------------------------\n');
                 end
                 
@@ -113,6 +131,8 @@ for k = 1 : length(subFolders)
                 total_detections_E5 = total_detections_E5 + num_detections_E5;
                 total_detections_E10 = total_detections_E10 + num_detections_E10;
                 total_detections_E15 = total_detections_E15 + num_detections_E15;
+            else
+                n_missed_detections = n_missed_detections+1;
             end
           end
           
@@ -127,6 +147,7 @@ for k = 1 : length(subFolders)
             fprintf(fileID,'false alarm rate: -1\r\n');
             fprintf(fileID,'(zero detections)\r\n');
           end
+          fprintf(fileID,'missed sources: %u out of %u\n', n_missed_detections, nsources);
           fclose(fileID);
       end
         
