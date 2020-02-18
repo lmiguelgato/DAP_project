@@ -125,7 +125,7 @@ for k = 1 : length(subFolders)
           end
           mm = nsources;
           if some_source
-            tmp = [k, j, i, mae15/mm, mae10/mm, mae5/mm, rms15/mm, rms10/mm, rms5/mm, e15/mm, e10/mm, e5/mm];
+            tmp = [k, j, i, mae15/mm, mae10/mm, mae5/mm, rms15/mm, rms10/mm, rms5/mm, e15/mm, e10/mm, e5/mm, nsources];
             all_data = [all_data; tmp];
           else
             no_data = [no_data; [k, j, i, h]];
@@ -150,6 +150,33 @@ mean_rms5   = sum(all_data(:, 9))/(mm-no_5);
 mean_e15    = mean(all_data(:, 10));
 mean_e10    = mean(all_data(:, 11));
 mean_e5     = mean(all_data(:, 12));
+
+mean_mae15_1s  = mean(all_data(all_data(:, 13) == 1, 4));
+mean_rms15_1s  = mean(all_data(all_data(:, 13) == 1, 7));
+mean_e15_1s    = mean(all_data(all_data(:, 13) == 1, 10));
+mean_e10_1s    = mean(all_data(all_data(:, 13) == 1, 11));
+mean_e5_1s     = mean(all_data(all_data(:, 13) == 1, 12));
+
+mean_mae15_2s  = mean(all_data(all_data(:, 13) == 2, 4));
+mean_rms15_2s  = mean(all_data(all_data(:, 13) == 2, 7));
+mean_e15_2s    = mean(all_data(all_data(:, 13) == 2, 10));
+mean_e10_2s    = mean(all_data(all_data(:, 13) == 2, 11));
+mean_e5_2s     = mean(all_data(all_data(:, 13) == 2, 12));
+
+
+mean_mae15_3s  = mean(all_data(all_data(:, 13) == 3, 4));
+mean_rms15_3s  = mean(all_data(all_data(:, 13) == 3, 7));
+mean_e15_3s    = mean(all_data(all_data(:, 13) == 3, 10));
+mean_e10_3s    = mean(all_data(all_data(:, 13) == 3, 11));
+mean_e5_3s     = mean(all_data(all_data(:, 13) == 3, 12));
+
+mean_mae15_4s  = mean(all_data(all_data(:, 13) == 4, 4));
+mean_rms15_4s  = mean(all_data(all_data(:, 13) == 4, 7));
+mean_e15_4s    = mean(all_data(all_data(:, 13) == 4, 10));
+mean_e10_4s    = mean(all_data(all_data(:, 13) == 4, 11));
+mean_e5_4s     = mean(all_data(all_data(:, 13) == 4, 12));
+
+
 
 Pmd = all_missedSources(:, 1)./all_missedSources(:, 2);
 
@@ -182,20 +209,42 @@ Pfa4 = mean(all_missedSources(all_missedSources(:, 2) == 4, 3));
 disp('When 1 source:')
 disp(['* ' num2str(N11/N1*100) ' % of times no sources were detected'])
 disp(['* ' num2str(N01/N1*100) ' % of times one source was detected'])
+disp('***')
 disp(['* ' num2str(Pfa1) ' % of detections were false alarms (outside +/- 15 degrees from any source)'])
+disp(['* ' num2str(mean_mae15_1s) ' degrees of average mean absolute error'])
+disp(['* ' num2str(mean_rms15_1s) ' degrees of average RMS error'])
+disp(['* ' num2str(mean_e5_1s) ' % of detections between 0 and 5 error degrees'])
+disp(['* ' num2str(mean_e10_1s) ' % of detections between 5 and 10 error degrees'])
+disp(['* ' num2str(mean_e15_1s) ' % of detections between 10 and 15 error degrees'])
+
+disp(' ')
 
 disp('When 2 sources:')
 disp(['* ' num2str(N22/N2*100) ' % of times no sources were detected'])
 disp(['* ' num2str(N12/N2*100) ' % of times one source was detected'])
 disp(['* ' num2str(N02/N2*100) ' % of times two sources were detected'])
+disp('***')
 disp(['* ' num2str(Pfa2) ' % of detections were false alarms (outside +/- 15 degrees from any source)'])
+disp(['* ' num2str(mean_mae15_2s) ' degrees of average mean absolute error'])
+disp(['* ' num2str(mean_rms15_2s) ' degrees of average RMS error'])
+disp(['* ' num2str(mean_e5_2s) ' % of detections between 0 and 5 error degrees'])
+disp(['* ' num2str(mean_e10_2s) ' % of detections between 5 and 10 error degrees'])
+disp(['* ' num2str(mean_e15_2s) ' % of detections between 10 and 15 error degrees'])
+disp(' ')
 
 disp('When 3 sources:')
 disp(['* ' num2str(N33/N3*100) ' % of times no sources were detected'])
 disp(['* ' num2str(N23/N3*100) ' % of times one source was detected'])
 disp(['* ' num2str(N13/N3*100) ' % of times two sources were detected'])
 disp(['* ' num2str(N03/N3*100) ' % of times three sources were detected'])
+disp('***')
 disp(['* ' num2str(Pfa3) ' % of detections were false alarms (outside +/- 15 degrees from any source)'])
+disp(['* ' num2str(mean_mae15_3s) ' degrees of average mean absolute error'])
+disp(['* ' num2str(mean_rms15_3s) ' degrees of average RMS error'])
+disp(['* ' num2str(mean_e5_3s) ' % of detections between 0 and 5 error degrees'])
+disp(['* ' num2str(mean_e10_3s) ' % of detections between 5 and 10 error degrees'])
+disp(['* ' num2str(mean_e15_3s) ' % of detections between 10 and 15 error degrees'])
+disp(' ')
 
 disp('When 4 sources:')
 disp(['* ' num2str(N44/N4*100) ' % of times no sources were detected'])
@@ -203,5 +252,12 @@ disp(['* ' num2str(N34/N4*100) ' % of times one source was detected'])
 disp(['* ' num2str(N24/N4*100) ' % of times two sources were detected'])
 disp(['* ' num2str(N14/N4*100) ' % of times three sources were detected'])
 disp(['* ' num2str(N04/N4*100) ' % of times four sources were detected'])
+disp('***')
 disp(['* ' num2str(Pfa4) ' % of detections were false alarms (outside +/- 15 degrees from any source)'])
-%N01 = sum(Pmd == 0.0 & all_missedSources(:, 2) == total_sources);
+disp(['* ' num2str(mean_mae15_4s) ' degrees of average mean absolute error'])
+disp(['* ' num2str(mean_rms15_4s) ' degrees of average RMS error'])
+disp(['* ' num2str(mean_e5_4s) ' % of detections between 0 and 5 error degrees'])
+disp(['* ' num2str(mean_e10_4s) ' % of detections between 5 and 10 error degrees'])
+disp(['* ' num2str(mean_e15_4s) ' % of detections between 10 and 15 error degrees'])
+disp(' ')
+
