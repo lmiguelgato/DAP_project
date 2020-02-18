@@ -145,7 +145,6 @@ for k = 1 : length(subFolders)
             fprintf(fileID,'false alarm rate: %6.2f %%\r\n', abs(false_alarm/(false_alarm+total_detections_E5+total_detections_E10+total_detections_E15)*100));
           else
             fprintf(fileID,'false alarm rate: -1\r\n');
-            fprintf(fileID,'(zero detections)\r\n');
           end
           fprintf(fileID,'missed sources: %u out of %u\n', n_missed_detections, nsources);
           fclose(fileID);
