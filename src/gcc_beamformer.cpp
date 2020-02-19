@@ -651,7 +651,7 @@ int main (int argc, char *argv[]) {
 	unsigned int i, j;
 
 	if(argc != 4 && argc != 3){		
-		printf ("Usage:\ndap_project d N k\nd: Microphone separation (in meters).\nN: Maximum number of sources.\nk: Which source to filter (optional parameter, the default option is filtering all sources).\n");
+		printf ("Usage:\ngcc_beamformer d N k\nd: Microphone separation (in meters).\nN: Maximum number of sources.\nk: Which source to filter (optional parameter, the default option is filtering all sources).\n");
 		exit(1);
 	}
 
@@ -675,7 +675,7 @@ int main (int argc, char *argv[]) {
 			printf("\nSource number %d is going to be filtered.\n\n", source2filter);
 	}
 
-	int system_output = system("mkdir -p output");
+	system("mkdir -p output");
 	char audio_file_path[100];
 	sprintf(audio_file_path, "./output/bf_audio_%d_of_%d.wav", source2filter, n_sources);
 
