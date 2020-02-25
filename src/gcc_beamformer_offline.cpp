@@ -19,325 +19,101 @@
 #include <iomanip>
 using namespace std;
 
-// Useful functions developed by myself:
-#include "max.h"
-#include "unwrap.h"
-#include "phat.h"
-#include "angleManipulation.h"
-#include "kmeans.h"
-#include "kalman.h"
-
-// FFTW: library for computing the discrete Fourier transform of arbitrary input size, 
-//       and of both real and complex data.
-#include <complex.h> 	// needs to be included before fftw3.h for compatibility
-#include <cmath>
-#include <fftw3.h>
-
-// Eigen: C++ template library for linear algebra: matrices, vectors, numerical solvers, and related algorithms.
-#include <Eigen/Eigen>
-
-// Libsndfile: library designed to allow the reading and writing of many different sampled sound file formats
-//             through one standard library interface.
-#include <sndfile.h>
-
-#define RAD2DEG 57.295779513082323f		// useful to convert from radians to degrees
-#define GCC_STYLE 4						// 1: GCC, 2:GCC (frequency restrained), 3:GCC-PHAT, 4:GCC-PHAT (frequency restrained)
-#define GCC_TH 100.0f					// correlation threshold (to avoid false alarms)
-#define REDUNDANCY_TH 20.0f				// redundancy threshold (for DOA estimation)
-#define DYNAMIC_GCC_TH 1				// enable a dynamic GCC threshold (0: disabled, 1: mean peak values, 2: max peak values)
-#define MOVING_AVERAGE 1				// enable a moving average on kmeans centroids (0: disabled, 1: finite memory, 2: infinite memory)
-#define MOVING_FACTOR 1					// allow variations in DOA if the sources are moving (how many times the standard deviation)
-#define MEMORY_FACTOR 5				    // memory of the k-means algorithm
-#define VERBOSE false					// display additional information
-
-// Libsndfile:
-SNDFILE * saudio_file;
-SNDFILE ** audio_file;
-SF_INFO audio_info;
-float *write_buffer;
-
-// FFTW:
-std::complex<double> *i_fft_4N, *i_time_4N, *o_fft_4N, *o_time_4N;
-std::complex<double> *i_fft_2N, *i_time_2N, *o_fft_2N, *o_time_2N;
-fftw_plan i_forward_4N, o_inverse_4N, i_forward_2N, o_inverse_2N;
-std::complex<double> ig(0.0, 1.0); 		// imaginary unit
-
-// default parameters:
-double sample_rate  = 48000.0;			// default sample rate [Hz]
-int nframes 		= 1024;				// default number of frames per jack buffer
-unsigned int window_size, window_size_2, nframes_2;	
-double mic_separation = 0.18;			// default microphone separation [meters]
-double c = 343.364;						// default sound speed [m/s]
-double dt_max, N_max;					// maximum delay between microphones [s, samples]
-double doa;								// direction of arrival
-double mean_doa = 0.0;					// average direction of arrival
-double std_doa = 90.0;					// standard deviation of the direction of arrival
-double std_cum = 90.0;					// standard deviation of the direction of arrival (cummulative)
-unsigned int n_sources = 1; 			// default number of sources to be detected
-int source2filter = 0;					// default source to filter
-double gcc_th = GCC_TH;					// default GCC threshold
-double fRes; 							// frequency resolution
-
-double f_min = 1000.0;					// minimum frequency of the desired signal [Hz]
-double f_max = 4000.0;					// maximum frequency of the desired signal [Hz]
-int kmin, kmax;							// discrete minimum and maximum frequencies of the desired signal
-
-unsigned int n_in_channels = 3;			// number of input channels
-
-int state = 0;							// beamformer state
-
-float *hann;		// array to store the Hann window
-
-// overlap-add registers:
-float **X_full;	// store the 6 last buffers of 'nframes' samples
-float **X_late;	// store the 4 latest buffers from X_full
-float **X_early;	// store the 4 earliest buffers from X_full
-
-// GCC registers:
-std::complex<double> **X_gcc;			// store GCC result (length 2 times 'nframes')
-std::complex<double> *Aux_gcc;			// store axuliary GCC result (length 2 times 'nframes')
-
-// DOA registers:
-double *DOA_hist;						// store DOA history
-unsigned int *DOA_class;				// store classification of DOA history
-double *DOA_kmean;						// store DOA mean for each source (kmeans algorithm)
-double *DOA_mean;						// store DOA mean for each source
-double *DOA_stdev;						// store DOA standard deviation for each source
-double *DOA_valid;						// store valid DOAs
-unsigned int *counter;					// store number of detections for each source
-int    *dcounter;						// number of valid DOAs
-int    *ecounter;						// number of smoothed valid DOAs
-int    icounter = 0;					// number of detections
-int    ccounter = 0;					// number of cycles
-int    hist_length;						// number of cycles
-bool   firstDetection = true;
-
-double **kalmanState;
-double **covMatrix;
-
 ofstream outputFile;					// save results for data analysis
 ofstream outputKalman;					// save results for data analysis
 
+#include "internals.h"
+
+#define VERBOSE false					// display additional information
+
 int main (int argc, char *argv[]) {
 
-	unsigned int i, j;
-
-	if(argc != 4 && argc != 3){		
-		printf ("Usage:\ngcc_beamformer d N k\nd: Microphone separation (in meters).\nN: Maximum number of sources.\nk: Which source to filter (optional parameter, the default option is filtering all sources).\n");
+	if(argc != 2){		
+		printf ("Usage:\ngcc_beamformer_offline <audio file path>\n");
 		exit(1);
 	}
 
-	mic_separation = atof(argv[1]);
-	printf("\nMicrophone separation: %1.4f meters.", mic_separation);	
-	n_sources = atoi(argv[2]);
-	printf("\nMaximum number of sources: %d.\n\n", n_sources);
+	char audio_file_path[1000];
+	sprintf(audio_file_path, "%s", argv[1]);
+	FILE* audiodata = fopen(audio_file_path, "r");
+	if (audiodata ==  NULL) {
+		printf("\nERROR: Could not open audio data file.\n\n");
+		exit(2);
+	}
+    fseek(audiodata, 22, SEEK_CUR);
 
-	if (argc == 4)
-	{
-		source2filter = atoi(argv[3]);
+	unsigned char buffer2[2];
 
-		if (source2filter > (int) n_sources || source2filter < -1) {
-			printf("The source to be filtered is not between 1 and the maximum number of sources provided. Quitting ...\n\n");
-			exit(1);
+	if(fread(&buffer2, sizeof(buffer2), 1, audiodata)) {
+		n_in_channels = buffer2[0] | (buffer2[1] << 8);
+		printf("%d audio channels detected ...\n", n_in_channels);
+		if (n_in_channels != 3) {
+			printf("This demo only supports 3 input channels. Aborting ...\n");
+			return 0;
 		}
-
-		if (source2filter == 0)
-			printf("\nAll sources are going to be filtered.\n\n");
-		else
-			printf("\nSource number %d is going to be filtered.\n\n", source2filter);
-	}
-
-	system("mkdir -p output");
-	char audio_file_path[100];
-	sprintf(audio_file_path, "./output/bf_audio_%d_of_%d.wav", source2filter, n_sources);
-
-	char text_file_path[100];
-	if (n_sources == 1)
-		sprintf(text_file_path, "./output/track_%d_source.txt", n_sources);
-	else		
-		sprintf(text_file_path, "./output/track_%d_sources.txt", n_sources);
-	outputFile.open(text_file_path);
-
-	char text_kalman_path[100];
-	if (n_sources == 1)
-		sprintf(text_kalman_path, "./output/track_%d_sourceKalman.txt", n_sources);
-	else		
-		sprintf(text_kalman_path, "./output/track_%d_sourcesKalman.txt", n_sources);
-	outputKalman.open(text_kalman_path);
-
-	dt_max = mic_separation/c;
-	N_max = dt_max*sample_rate;
-
-	// obtain here the delay from user and store it in 'delay' 
-	nframes 	= 4000;   //TODO: do not let this hard coded
-	nframes_2   = nframes/2;
-	window_size = 4*nframes;
-	window_size_2 = 2*nframes;
-	kmin = (int) (f_min/sample_rate*window_size_2);
-	kmax = (int) (f_max/sample_rate*window_size_2);
-
-	fRes = 2.0*M_PI/window_size;
-
-	hist_length = MEMORY_FACTOR*n_sources;
-
-	// initialization of internal buffers
-	// - overlap-add buffers
-	X_late		= (float **) calloc(n_in_channels, sizeof(float*));
-	X_early		= (float **) calloc(n_in_channels, sizeof(float*));
-	X_full		= (float **) calloc(n_in_channels, sizeof(float*));
-	X_gcc		= (std::complex<double> **) calloc(n_in_channels, sizeof(std::complex<double>*));
-	Aux_gcc		= (std::complex<double> *) calloc(window_size_2, sizeof(std::complex<double>));
-	DOA_hist	= (double *) calloc(hist_length, sizeof(double));
-	DOA_class	= (unsigned int *) calloc(hist_length, sizeof(unsigned int));
-	DOA_kmean	= (double *) calloc(n_sources, sizeof(double));
-	DOA_mean	= (double *) calloc(n_sources, sizeof(double));
-	DOA_stdev	= (double *) calloc(n_sources, sizeof(double));
-	DOA_valid	= (double *) calloc(n_sources, sizeof(double));
-	kalmanState = (double **) calloc(4, sizeof(double*));
-	covMatrix   = (double **) calloc(4*n_sources, sizeof(double*));
-
-	counter		= (unsigned int *) calloc(n_sources, sizeof(unsigned int));
-	dcounter	= (int *) calloc(n_sources, sizeof(int));
-	ecounter	= (int *) calloc(n_sources, sizeof(int));
-	write_buffer = (float *) calloc(nframes, sizeof(float));
-
-	std::default_random_engine generator;
-  	std::uniform_real_distribution<double> distribution(-180.0,180.0);
-
-	for (i = 0; i < n_sources; ++i)
-	{
-		DOA_kmean[i] = 360.0/n_sources*i; //+ distribution(generator); 360.0/2.0/n_sources;	// "optimal" initialization for the k-means algorithm
-		//DOA_kmean[i] = distribution(generator);	// random initialization for the k-means algorithm
-		if (DOA_kmean[i] > 180.0) {
-			DOA_kmean[i] -= 360.0;
-		}
-		//DOA_kmean[i] = distribution(generator);	// random initialization for the k-means algorithm
-		DOA_stdev[i] = 360.0/2.0/n_sources;
-	}
-
-	for (i = 0; i < 4; ++i) {
-		kalmanState[i] = (double *) calloc(n_sources, sizeof(double));
-		for (j = 0; j < n_sources; ++j) {
-			covMatrix[j*4+i] = (double *) calloc(4, sizeof(double));
-		}
-	}
-
-	// initialize Kalman state:
-	double initialState[2];
-	for (i = 0; i < n_sources; ++i) {
-		angle2state(DOA_kmean[i], initialState);
-
-		kalmanState[0][i] = initialState[0];
-		kalmanState[1][i] = initialState[1];
-	}
-
-
-    for (i = 0; i < n_in_channels; ++i) {
-        X_late[i]	= (float *) calloc(window_size, sizeof(float));
-		X_early[i]	= (float *) calloc(window_size, sizeof(float));
-		X_full[i]	= (float *) calloc(window_size + window_size_2, sizeof(float));
-		X_gcc[i]	= (std::complex<double> *) calloc(window_size_2, sizeof(std::complex<double>));
-    }	
-
-	// - FFTW3 buffers
-	i_fft_4N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
-	i_time_4N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
-	o_fft_4N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
-	o_time_4N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
-	
-	i_forward_4N = fftw_plan_dft_1d(window_size, reinterpret_cast<fftw_complex*>(i_time_4N), reinterpret_cast<fftw_complex*>(i_fft_4N), FFTW_FORWARD, FFTW_MEASURE);
-	o_inverse_4N = fftw_plan_dft_1d(window_size, reinterpret_cast<fftw_complex*>(o_fft_4N), reinterpret_cast<fftw_complex*>(o_time_4N), FFTW_BACKWARD, FFTW_MEASURE);
-
-	i_fft_2N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size_2);
-	i_time_2N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size_2);
-	o_fft_2N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size_2);
-	o_time_2N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size_2);
-
-	i_forward_2N = fftw_plan_dft_1d(window_size_2, reinterpret_cast<fftw_complex*>(i_time_2N), reinterpret_cast<fftw_complex*>(i_fft_2N), FFTW_FORWARD, FFTW_MEASURE);
-	o_inverse_2N = fftw_plan_dft_1d(window_size_2, reinterpret_cast<fftw_complex*>(o_fft_2N), reinterpret_cast<fftw_complex*>(o_time_2N), FFTW_BACKWARD, FFTW_MEASURE);
-	
-	sample_rate = 48000;    // TODO: do not le this hard coded
-
-	// - hann window
-	hann = (float *) calloc(window_size, sizeof(float)); 
-	for(i = 0; i < window_size; ++i) {
-		hann[i] = 0.5 - 0.5*cos(2.0*M_PI* ((double) i/(window_size-1)));
-	}
-
-	audio_file = (SNDFILE **) calloc(n_sources, sizeof(SNDFILE*));
-
-	if (source2filter == 0) {
-		for (i = 0; i < n_sources; ++i)
-		{
-			printf("Trying to open audio File: ./output/bf_audio_%d_of_%d.wav\n", i+1, n_sources);
-			audio_info.samplerate = sample_rate;
-			audio_info.channels = 1;
-			audio_info.format = SF_FORMAT_WAV | SF_FORMAT_PCM_32;
-
-			sprintf(audio_file_path, "./output/bf_audio_%d_of_%d.wav", i+1, n_sources);
-			audio_file[i] = sf_open (audio_file_path,SFM_WRITE,&audio_info);
-
-			if(audio_file[i] == NULL){
-				printf("%s\n",sf_strerror(NULL));
-				exit(1);
-			}else{
-				printf("Audio file info:\n");
-				printf("\tSample Rate: %d\n",audio_info.samplerate);
-				printf("\tChannels: %d\n",audio_info.channels);
-			}
-		}	
 	} else {
-		if (source2filter != -1)
-		{
-			printf("Trying to open audio File: %s\n",audio_file_path);
-			audio_info.samplerate = sample_rate;
-			audio_info.channels = 1;
-			audio_info.format = SF_FORMAT_WAV | SF_FORMAT_PCM_32;
+		printf("Error reading audio file. Aborting ...\n");
+		exit(2);
+	}
 
-			saudio_file = sf_open (audio_file_path,SFM_WRITE,&audio_info);
-			if(saudio_file == NULL){
-				printf("%s\n",sf_strerror(NULL));
-				exit(1);
-			}else{
-				printf("Audio file info:\n");
-				printf("\tSample Rate: %d\n",audio_info.samplerate);
-				printf("\tChannels: %d\n",audio_info.channels);
+	unsigned char buffer4[4];
+
+	if (fread(&buffer4, sizeof(buffer4), 1, audiodata)) {
+		sample_rate = buffer4[0] | (buffer4[1] << 8) | (buffer4[2] << 16) | (buffer4[3] << 24);
+		printf("%d Hz sampling rate ...\n", (unsigned int) sample_rate);
+	} else {
+		printf("Error reading audio file. Aborting ...\n");
+		exit(2);
+	}
+	
+    int16_t recvsample_s;
+	nframes = 1024;
+	init();		// Initialize all internal registers, variables and memory allocation
+
+	float * in = (float *)malloc(nframes*n_in_channels*sizeof(float));
+
+	fseek(audiodata, 44, SEEK_CUR);
+
+	while (!feof(audiodata)) {
+		
+		for (unsigned int j = 0; j < (unsigned int) nframes; j++) {
+			for (unsigned int i = 0; i < n_in_channels; i++) {
+				if(fread(&recvsample_s, sizeof(int16_t), 1, audiodata)) {
+					in[j*n_in_channels + i] = recvsample_s / 32767.0f;
+				}
 			}
 		}
-	}	
+		process_audio(in);
+	}
 	
 	outputFile.close();
 	outputKalman.close();
-	exit (0);
+	return 0;
 }
 
-int jack_callback (int nframes, void *arg){
+void process_audio (float *in){
 
-	unsigned int i, j, k;
-
-	float **in;
-
-	in = (float **)malloc(n_in_channels*sizeof(float *));
-	for(i = 0; i < n_in_channels; ++i)
-		//in[i] = (float *)jack_port_get_buffer (input_ports[i], nframes);  //TODO: get audio samples by a buffer
+	unsigned int i, j;
 
 	for (j = 0; j < n_in_channels; ++j) {
 
 		// shift-register (useful for overlap-add method):
-		for (i = 0; i < nframes; ++i)
+		for (i = 0; i < (unsigned int) nframes; ++i)
 		{
 			X_full[j][i] 						= X_full[j][nframes + i];
 			X_full[j][nframes + i] 				= X_full[j][window_size_2 + i];
 			X_full[j][window_size_2 + i] 		= X_full[j][window_size-nframes + i];
 			X_full[j][window_size-nframes + i] 	= X_full[j][window_size + i];
 			X_full[j][window_size + i] 			= X_full[j][window_size+nframes + i];
-			X_full[j][window_size+nframes + i] 	= in[j][i];	
+			X_full[j][window_size+nframes + i] 	= in[i*n_in_channels + j];	
 		}
 
 		// cross-correlation in four steps:
 		// 1- zero padding:
-		for (i = 0; i < nframes; ++i)
-			i_time_2N[i] = in[j][i];
+		for (i = 0; i < (unsigned int) nframes; ++i) {
+			i_time_2N[i] = in[i*n_in_channels + j];
+			printf("%6.12f, ", real(i_time_2N[i]));
+		}
 
 		for (i = nframes; i < window_size_2; ++i)
 			i_time_2N[i] = 0.0;
@@ -538,257 +314,115 @@ int jack_callback (int nframes, void *arg){
 		}
 		outputFile << endl;
 	}
+}
 
-	unsigned int write_count;
-	int delay[2];
+void init(void) {
+	system("mkdir -p output");
 
-	if (source2filter != 0) {
-		if (source2filter != -1) {
-			if (ecounter[source2filter-1] > 0) 	// if at least one valid DOA was found of the target source, apply beamforming
-			{
-				delay[0] = (int) (mic_separation*sin(DOA_valid[source2filter-1]/RAD2DEG)/c*sample_rate);
-				delay[1] = (int) (mic_separation*sin((120.0-DOA_valid[source2filter-1])/RAD2DEG)/c*sample_rate);
+	if (n_sources == 1)
+		sprintf(text_file_path, "./output/track_%d_source.txt", n_sources);
+	else		
+		sprintf(text_file_path, "./output/track_%d_sources.txt", n_sources);
+	outputFile.open(text_file_path);
 
-				//printf("doa = %1.5f\n", DOA_valid[source2filter-1]);
+	if (n_sources == 1)
+		sprintf(text_kalman_path, "./output/track_%d_sourceKalman.txt", n_sources);
+	else		
+		sprintf(text_kalman_path, "./output/track_%d_sourcesKalman.txt", n_sources);
+	outputKalman.open(text_kalman_path);
 
-				//----  BEAMFORMING:
+	dt_max = mic_separation/c;
+	N_max = dt_max*sample_rate;
 
-				for (k = 1; k < n_in_channels; ++k)
-				{
-					// ---------------------------- 1st window ------------------------------------------
+	// obtain here the delay from user and store it in 'delay'
+	nframes_2   = nframes/2;
+	window_size = 4*nframes;
+	window_size_2 = 2*nframes;
+	kmin = (int) (f_min/sample_rate*window_size_2);
+	kmax = (int) (f_max/sample_rate*window_size_2);
 
-					// FFT of the 1st window:
-					for(i = 0; i < window_size; i++){
-						i_time_4N[i] = X_full[k][i]*hann[i];
-					}
-					fftw_execute(i_forward_4N);
-					
-					// delay the 1st window in frequency domain:
-					for(i = 0; i < window_size; i++){
-						o_fft_4N[i] = i_fft_4N[i]*exp(ig*fRes*((double) i*delay[k-1]));
-					}
-					
-					// i-FFT of the 1st window:
-					fftw_execute(o_inverse_4N);
-					for(i = 0; i < window_size; i++){
-						X_late[k][i] = real(o_time_4N[i])/window_size; //fftw3 requires normalizing its output
-					}
+	fRes = 2.0*M_PI/window_size;
 
-					// ---------------------------- 2nd window ------------------------------------------
+	hist_length = MEMORY_FACTOR*n_sources;
 
-					// FFT of the 2nd window:
-					for(i = 0; i < window_size; i++){
-						i_time_4N[i] = X_full[k][window_size_2+i]*hann[i];
-					}
-					fftw_execute(i_forward_4N);
-					
-					// delay the 2nd window in frequency domain:
-					for(i = 0; i < window_size; i++){
-						o_fft_4N[i] = i_fft_4N[i]*exp(ig*fRes*((double) i*delay[k-1]));
-					}
-					
-					// i-FFT of the 2nd window:
-					fftw_execute(o_inverse_4N);
-					for(i = 0; i < window_size; i++){
-						X_early[k][i] = real(o_time_4N[i])/window_size; //fftw3 requires normalizing its output
-					}
-				}
-				
-				max_max = 0.0f;
+	// initialization of internal buffers
+	// - overlap-add buffers
+	X_late		= (float **) calloc(n_in_channels, sizeof(float*));
+	X_early		= (float **) calloc(n_in_channels, sizeof(float*));
+	X_full		= (float **) calloc(n_in_channels, sizeof(float*));
+	X_gcc		= (std::complex<double> **) calloc(n_in_channels, sizeof(std::complex<double>*));
+	Aux_gcc		= (std::complex<double> *) calloc(window_size_2, sizeof(std::complex<double>));
+	DOA_hist	= (double *) calloc(hist_length, sizeof(double));
+	DOA_class	= (unsigned int *) calloc(hist_length, sizeof(unsigned int));
+	DOA_kmean	= (double *) calloc(n_sources, sizeof(double));
+	DOA_mean	= (double *) calloc(n_sources, sizeof(double));
+	DOA_stdev	= (double *) calloc(n_sources, sizeof(double));
+	DOA_valid	= (double *) calloc(n_sources, sizeof(double));
+	kalmanState = (double **) calloc(4, sizeof(double*));
+	covMatrix   = (double **) calloc(4*n_sources, sizeof(double*));
 
-					if (max_val12 > max_max)
-						max_max = max_val12;
-					if (max_val23 > max_max)
-						max_max = max_val23;
-					if (max_val31 > max_max)
-						max_max = max_val31;
+	counter		= (unsigned int *) calloc(n_sources, sizeof(unsigned int));
+	dcounter	= (int *) calloc(n_sources, sizeof(int));
+	ecounter	= (int *) calloc(n_sources, sizeof(int));
+	write_buffer = (float *) calloc(nframes, sizeof(float));
 
-					if (max_max == 0.0f) {
-						if(state == 1) exit(1);
-					}
-					else {
-						if(state == 0) state = 1;
+	std::default_random_engine generator;
+  	std::uniform_real_distribution<double> distribution(-180.0,180.0);
 
-						// perform overlap-add:		
-						for (i = 0; i < nframes; ++i) {
-							write_buffer[i] = X_full[0][i+window_size_2+nframes_2];
-							for (k = 1; k < n_in_channels; ++k)
-							{
-								write_buffer[i] += X_late[k][i+window_size_2+nframes_2] + X_early[k][i+nframes_2];
-							}
-							write_buffer[i] /= 3.0;
-						}
-
-						write_count = sf_write_float(saudio_file,write_buffer,nframes);
-
-						//Check for writing error
-						if(write_count != nframes){
-							printf("\nEncountered I/O error. Exiting.\n");
-							//TODO: put interface with the WAV writer
-							exit (1);
-					}
-				}
-				
-			} else {	// don't start writing if no audio is being played
-				max_max = 0.0;
-
-				if (max_val12 > max_max)
-					max_max = max_val12;
-				if (max_val23 > max_max)
-					max_max = max_val23;
-				if (max_val31 > max_max)
-					max_max = max_val31;
-
-				if (max_max == 0.0f) {
-					if(state == 1) exit(1);
-				} else {
-					if(state == 0) state = 1;
-
-					for (i = 0; i < nframes; ++i) {
-						write_buffer[i] = X_full[0][i+window_size_2+nframes_2];
-					}
-					write_count = sf_write_float(saudio_file,write_buffer,nframes);
-
-					//Check for writing error
-					if(write_count != nframes){
-						printf("\nEncountered I/O error. Exiting.\n");
-                        //TODO: put interface with WAV writer
-						exit (1);
-					}
-				}
-			}
-		} else {
-			max_max = 0.0f;
-
-			if (max_val12 > max_max)
-				max_max = max_val12;
-			if (max_val23 > max_max)
-				max_max = max_val23;
-			if (max_val31 > max_max)
-				max_max = max_val31;
-
-			if (max_max == 0.0f) {
-				if(state == 1) exit(1);
-			}
-			else {
-				if(state == 0) state = 1;
-			}
+	for (unsigned int i = 0; i < n_sources; ++i)
+	{
+		DOA_kmean[i] = 360.0/n_sources*i; //+ distribution(generator); 360.0/2.0/n_sources;	// "optimal" initialization for the k-means algorithm
+		//DOA_kmean[i] = distribution(generator);	// random initialization for the k-means algorithm
+		if (DOA_kmean[i] > 180.0) {
+			DOA_kmean[i] -= 360.0;
 		}
+		//DOA_kmean[i] = distribution(generator);	// random initialization for the k-means algorithm
+		DOA_stdev[i] = 360.0/2.0/n_sources;
+	}
 
-	} else {
-		// filter all
-		for (unsigned int s2f = 1; s2f <= n_sources; ++s2f)
-		{
-			if (ecounter[s2f-1] > 0) 	// if at least one valid DOA was found of the target source, apply beamforming
-			{
-				delay[0] = (int) (mic_separation*sin(DOA_valid[s2f-1]/RAD2DEG)/c*sample_rate);
-				delay[1] = (int) (mic_separation*sin((120.0-DOA_valid[s2f-1])/RAD2DEG)/c*sample_rate);
-
-				for (k = 1; k < n_in_channels; ++k)
-				{
-					// ---------------------------- 1st window ------------------------------------------
-
-					// FFT of the 1st window:
-					for(i = 0; i < window_size; i++){
-						i_time_4N[i] = X_full[k][i]*hann[i];
-					}
-					fftw_execute(i_forward_4N);
-					
-					// delay the 1st window in frequency domain:
-					for(i = 0; i < window_size; i++){
-						o_fft_4N[i] = i_fft_4N[i]*exp(ig*fRes*((double) i*delay[k-1]));
-					}
-					
-					// i-FFT of the 1st window:
-					fftw_execute(o_inverse_4N);
-					for(i = 0; i < window_size; i++){
-						X_late[k][i] = real(o_time_4N[i])/window_size; //fftw3 requires normalizing its output
-					}
-
-					// ---------------------------- 2nd window ------------------------------------------
-
-					// FFT of the 2nd window:
-					for(i = 0; i < window_size; i++){
-						i_time_4N[i] = X_full[k][window_size_2+i]*hann[i];
-					}
-					fftw_execute(i_forward_4N);
-					
-					// delay the 2nd window in frequency domain:
-					for(i = 0; i < window_size; i++){
-						o_fft_4N[i] = i_fft_4N[i]*exp(ig*fRes*((double) i*delay[k-1]));
-					}
-					
-					// i-FFT of the 2nd window:
-					fftw_execute(o_inverse_4N);
-					for(i = 0; i < window_size; i++){
-						X_early[k][i] = real(o_time_4N[i])/window_size; //fftw3 requires normalizing its output
-					}
-
-					max_max = 0.0f;
-
-					if (max_val12 > max_max)
-						max_max = max_val12;
-					if (max_val23 > max_max)
-						max_max = max_val23;
-					if (max_val31 > max_max)
-						max_max = max_val31;
-
-					if (max_max == 0.0f) {
-						if(state == 1) exit(1);
-					}
-					else {
-						if(state == 0) state = 1;
-
-						// perform overlap-add:		
-						for (i = 0; i < nframes; ++i) {
-							write_buffer[i] = X_full[0][i+window_size_2+nframes_2];;
-							for (k = 1; k < n_in_channels; ++k)
-							{
-								write_buffer[i] += X_late[k][i+window_size_2+nframes_2] + X_early[k][i+nframes_2];
-							}
-							write_buffer[i] /= 3.0;
-						}
-
-						write_count = sf_write_float(audio_file[s2f-1],write_buffer,nframes);
-
-						//Check for writing error
-						if(write_count != nframes){
-							printf("\nEncountered I/O error. Exiting.\n");
-                            //TODO: put interface with WAV writer
-							exit (1);
-						}
-					}
-				}
-			} else {	// don't start writing if no audio is being played
-				max_max = 0.0f;
-
-				if (max_val12 > max_max)
-					max_max = max_val12;
-				if (max_val23 > max_max)
-					max_max = max_val23;
-				if (max_val31 > max_max)
-					max_max = max_val31;
-
-				if (max_max == 0.0f) {
-					if(state == 1) exit(1);
-				}
-				else {
-					if(state == 0) state = 1;
-
-					for (i = 0; i < nframes; ++i) {
-						write_buffer[i] = X_full[0][i+window_size_2+nframes_2];
-					}
-					write_count = sf_write_float(audio_file[s2f-1],write_buffer,nframes);
-
-					//Check for writing error
-					if(write_count != nframes){
-						printf("\nEncountered I/O error. Exiting.\n");
-						//TODO: put interface with WAV writer
-						exit (1);
-					}
-				}
-			}			
+	for (unsigned int i = 0; i < 4; ++i) {
+		kalmanState[i] = (double *) calloc(n_sources, sizeof(double));
+		for (unsigned int j = 0; j < n_sources; ++j) {
+			covMatrix[j*4+i] = (double *) calloc(4, sizeof(double));
 		}
 	}
-	return 0;
+
+	// initialize Kalman state:
+	for (unsigned int i = 0; i < n_sources; ++i) {
+		angle2state(DOA_kmean[i], initialState);
+
+		kalmanState[0][i] = initialState[0];
+		kalmanState[1][i] = initialState[1];
+	}
+
+
+    for (unsigned int i = 0; i < n_in_channels; ++i) {
+        X_late[i]	= (float *) calloc(window_size, sizeof(float));
+		X_early[i]	= (float *) calloc(window_size, sizeof(float));
+		X_full[i]	= (float *) calloc(window_size + window_size_2, sizeof(float));
+		X_gcc[i]	= (std::complex<double> *) calloc(window_size_2, sizeof(std::complex<double>));
+    }	
+
+	// - FFTW3 buffers
+	i_fft_4N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
+	i_time_4N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
+	o_fft_4N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
+	o_time_4N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size);
+	
+	i_forward_4N = fftw_plan_dft_1d(window_size, reinterpret_cast<fftw_complex*>(i_time_4N), reinterpret_cast<fftw_complex*>(i_fft_4N), FFTW_FORWARD, FFTW_MEASURE);
+	o_inverse_4N = fftw_plan_dft_1d(window_size, reinterpret_cast<fftw_complex*>(o_fft_4N), reinterpret_cast<fftw_complex*>(o_time_4N), FFTW_BACKWARD, FFTW_MEASURE);
+
+	i_fft_2N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size_2);
+	i_time_2N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size_2);
+	o_fft_2N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size_2);
+	o_time_2N = (std::complex<double>*) fftw_malloc(sizeof(std::complex<double>) * window_size_2);
+
+	i_forward_2N = fftw_plan_dft_1d(window_size_2, reinterpret_cast<fftw_complex*>(i_time_2N), reinterpret_cast<fftw_complex*>(i_fft_2N), FFTW_FORWARD, FFTW_MEASURE);
+	o_inverse_2N = fftw_plan_dft_1d(window_size_2, reinterpret_cast<fftw_complex*>(o_fft_2N), reinterpret_cast<fftw_complex*>(o_time_2N), FFTW_BACKWARD, FFTW_MEASURE);
+
+	// - hann window
+	hann = (float *) calloc(window_size, sizeof(float)); 
+	for(unsigned int i = 0; i < window_size; ++i) {
+		hann[i] = 0.5 - 0.5*cos(2.0*M_PI* ((double) i/(window_size-1)));
+	}
 }

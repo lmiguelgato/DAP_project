@@ -16,7 +16,9 @@
         "ratio": "cpp",
         "tuple": "cpp",
         "type_traits": "cpp",
-        "utility": "cpp"
+        "utility": "cpp",
+        "atomic": "cpp",
+        "cstdint": "cpp"
     },
     "terminal.integrated.shell.windows": "cmd.exe",
     "git.ignoreLimitWarning": true
