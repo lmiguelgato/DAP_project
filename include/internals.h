@@ -96,9 +96,10 @@ double **kalmanState;
 double **covMatrix;
 double initialState[2];
 
-char audio_file_path[100];
-char text_file_path[100];
-char text_kalman_path[100];
+char audio_file_path[1000];
+char output_file_path[1000];
+char text_file_path[20];
+char text_kalman_path[20];
 
 void init(void);    // Initialize all internal registers, variables and memory allocation
 void process_audio (float*);

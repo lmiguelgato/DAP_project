@@ -9,7 +9,7 @@
             //"program": "${workspaceFolder}/bin/gcc_beamformer",
             //"args": ["0.23", "3"],
             "program": "${workspaceFolder}/bin/gcc_beamformer_offline",
-            "args": ["bin/3mics.wav"],
+            "args": ["bin/3mics.wav", "../"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

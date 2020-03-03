@@ -28,12 +28,43 @@ ofstream outputKalman;					// save results for data analysis
 
 int main (int argc, char *argv[]) {
 
-	if(argc != 2){		
-		printf ("Usage:\ngcc_beamformer_offline <audio file path>\n");
+	if(argc != 2 && argc != 3){		
+		printf ("Usage:\ngcc_beamformer_offline <audio file path> <output path>\n");
 		exit(1);
 	}
 
-	char audio_file_path[1000];
+	char* full_path;
+	const char* str1 = "gcc_ssl.txt";
+	const char* str2 = "gcc_sst.txt";
+
+	if(argc == 2){
+		printf ("No output path specified. The current directory will be used ...\n");
+		sprintf(output_file_path, "%s", "./");
+
+		const char* str3 = "./";
+		full_path = (char*) malloc(strlen(str3)+strlen(str1)+1); 
+		strcpy(full_path, str3);
+		strcat(full_path, str1);
+		outputFile.open(full_path);
+
+		full_path = (char*) malloc(strlen(str3)+strlen(str2)+1); 
+		strcpy(full_path, str3);
+		strcat(full_path, str2);
+		outputKalman.open(full_path);
+	} else {		
+		sprintf(output_file_path, "%s", argv[2]);
+		
+		full_path = (char*) malloc(strlen(argv[2])+strlen(str1)+1); 
+		strcpy(full_path, argv[2]);
+		strcat(full_path, str1);
+		outputFile.open(full_path);
+
+		full_path = (char*) malloc(strlen(argv[2])+strlen(str2)+1); 
+		strcpy(full_path, argv[2]);
+		strcat(full_path, str2);
+		outputKalman.open(full_path);
+	}
+
 	sprintf(audio_file_path, "%s", argv[1]);
 	FILE* audiodata = fopen(audio_file_path, "r");
 	if (audiodata ==  NULL) {
@@ -238,7 +269,10 @@ void process_audio (float *in){
 					kalmanState[0][i] = initialThisState[0];
 					kalmanState[1][i] = initialThisState[1];
 
+if (VERBOSE)
+{
 					printf("kalman initialization[%d]: %1.1f\n", i, DOA_kmean[i]);
+}
 				}
 			}
 
@@ -298,8 +332,10 @@ void process_audio (float *in){
 						} else {
 							DOA_valid[i] = DOA_mean[i];
 						}
-
+if (VERBOSE)
+{
 						printf("DOA[%d] = %1.1f\n", i, DOA_valid[i]);
+}
 						outputFile << setprecision(2) << DOA_valid[i];			// save results into text file
 					}
 
@@ -319,12 +355,7 @@ void process_audio (float *in){
 	}
 }
 
-void init(void) {	
-	sprintf(text_file_path, "gcc_ssl.txt");
-	outputFile.open(text_file_path);
-
-	sprintf(text_kalman_path, "gcc_sst.txt");
-	outputKalman.open(text_kalman_path);
+void init(void) {
 
 	dt_max = mic_separation/c;
 	N_max = dt_max*sample_rate;
