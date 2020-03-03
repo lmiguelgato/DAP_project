@@ -40,7 +40,7 @@ int main (int argc, char *argv[]) {
 		printf("\nERROR: Could not open audio data file.\n\n");
 		exit(2);
 	}
-    fseek(audiodata, 22, SEEK_CUR);
+    fseek(audiodata, 22, SEEK_SET);
 
 	unsigned char buffer2[2];
 
@@ -72,16 +72,19 @@ int main (int argc, char *argv[]) {
 
 	float * in = (float *)malloc(nframes*n_in_channels*sizeof(float));
 
-	fseek(audiodata, 44, SEEK_CUR);
+	fseek(audiodata, 44, SEEK_SET);
 
 	while (!feof(audiodata)) {
 		
-		for (unsigned int j = 0; j < (unsigned int) nframes; j++) {
-			for (unsigned int i = 0; i < n_in_channels; i++) {
+		for (unsigned int i = 0; i < (unsigned int) nframes; i++) {
+			for (unsigned int j = 0; j < n_in_channels; j++) {
 				if(fread(&recvsample_s, sizeof(int16_t), 1, audiodata)) {
-					in[j*n_in_channels + i] = recvsample_s / 32767.0f;
+					in[i*n_in_channels + j] = recvsample_s / 32767.0f;
 				}
 			}
+			/*printf("%6.12f, ", in[i*n_in_channels + 0]);
+			printf("%6.12f, ", in[i*n_in_channels + 1]);
+			printf("%6.12f; \n", in[i*n_in_channels + 2]);*/
 		}
 		process_audio(in);
 	}
@@ -112,7 +115,7 @@ void process_audio (float *in){
 		// 1- zero padding:
 		for (i = 0; i < (unsigned int) nframes; ++i) {
 			i_time_2N[i] = in[i*n_in_channels + j];
-			printf("%6.12f, ", real(i_time_2N[i]));
+			//printf("%6.12f, ", real(i_time_2N[i]));
 		}
 
 		for (i = nframes; i < window_size_2; ++i)
@@ -316,19 +319,11 @@ void process_audio (float *in){
 	}
 }
 
-void init(void) {
-	system("mkdir -p output");
-
-	if (n_sources == 1)
-		sprintf(text_file_path, "./output/track_%d_source.txt", n_sources);
-	else		
-		sprintf(text_file_path, "./output/track_%d_sources.txt", n_sources);
+void init(void) {	
+	sprintf(text_file_path, "gcc_ssl.txt");
 	outputFile.open(text_file_path);
 
-	if (n_sources == 1)
-		sprintf(text_kalman_path, "./output/track_%d_sourceKalman.txt", n_sources);
-	else		
-		sprintf(text_kalman_path, "./output/track_%d_sourcesKalman.txt", n_sources);
+	sprintf(text_kalman_path, "gcc_sst.txt");
 	outputKalman.open(text_kalman_path);
 
 	dt_max = mic_separation/c;
