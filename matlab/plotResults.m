@@ -7,8 +7,8 @@ folder = uigetdir('.', ...
 
 addpath(folder)
 
-enableML = 1;
-max_num_sources = 3;
+enableML = 0;
+max_num_sources = 4;
 
 if max_num_sources == 1
     filename = strcat('track_', num2str(max_num_sources), '_source');

@@ -147,6 +147,8 @@ for i = 1:length(MLindexes)
     labels{end+1} = strcat('Instantaneous_', num2str(i));
     hold on; plot(kalmanDOA(idx),'LineWidth',2)
     labels{end+1} = strcat('Kalman_', num2str(i));
+    
+    kalmanDOA(idx)
 end
 legend(labels)
 
