@@ -147,10 +147,10 @@ void angleTranslation (double *theta, float *alpha) {
 		}
 	}
 
-	theta[1] -= 180.0 - alpha[1];
-	theta[2] += 180.0 - alpha[0];
-	theta[4] -= 180.0 - alpha[1];
-	theta[5] += 180.0 - alpha[0];
+	theta[1] -= 180.0 - alpha[1]*RAD2DEG;
+	theta[2] += 180.0 - alpha[0]*RAD2DEG;
+	theta[4] -= 180.0 - alpha[1]*RAD2DEG;
+	theta[5] += 180.0 - alpha[0]*RAD2DEG;
 
 	for (i = 0; i < 6; ++i) {
 		if (theta[i] > 180.0) {
@@ -176,10 +176,10 @@ void angleTranslation (double *theta) {
 		}
 	}
 
-	theta[1] -= 120;
-	theta[2] += 120;
-	theta[4] -= 120;
-	theta[5] += 120;
+	theta[1] -= 120.0;
+	theta[2] += 120.0;
+	theta[4] -= 120.0;
+	theta[5] += 120.0;
 
 	for (i = 0; i < 6; ++i) {
 		if (theta[i] > 180.0) {

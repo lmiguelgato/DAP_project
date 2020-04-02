@@ -1,0 +1,9 @@
+# Microphone 1
+0.158
+0.115
+# Microphone 2
+0.158
+-0.115
+# Microphone 3
+-0.045
+0.000

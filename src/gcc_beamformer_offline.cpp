@@ -35,7 +35,7 @@ int main (int argc, char *argv[]) {
 	}
 
 	string line;
-	ifstream settings_file ("./config/array_settings.txt");
+	ifstream settings_file ("array_settings.txt");
 	if (settings_file.is_open())
 	{
 		getline (settings_file,line);
@@ -410,9 +410,9 @@ void measure_array_geometry (float* mic_pos, float* side, float* angle) {
 
 void init(void) {
 
-	N_max[0] = sides[0]/c*sample_rate;
-	N_max[1] = sides[1]/c*sample_rate;
-	N_max[2] = sides[2]/c*sample_rate;
+	N_max[0] = (int) (sides[0]/c*sample_rate);
+	N_max[1] = (int) (sides[1]/c*sample_rate);
+	N_max[2] = (int) (sides[2]/c*sample_rate);
 
 	// obtain here the delay from user and store it in 'delay'
 	nframes_2   = nframes/2;

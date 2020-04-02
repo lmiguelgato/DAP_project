@@ -49,7 +49,7 @@ double sample_rate;			            // sample rate [Hz]
 int nframes = 1024;				        // default number of frames per jack buffer
 unsigned int window_size, window_size_2, nframes_2;
 double c = 343.364;						// default sound speed [m/s]
-double N_max[3];				        // maximum delay between microphones [samples]
+int N_max[3];				        // maximum delay between microphones [samples]
 double doa;								// direction of arrival
 double mean_doa = 0.0;					// average direction of arrival
 double std_doa = 90.0;					// standard deviation of the direction of arrival
