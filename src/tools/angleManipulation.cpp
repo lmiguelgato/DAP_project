@@ -135,22 +135,51 @@ double angleRedundancy (double* theta, double* thetaRedundant, double Ethresh) {
 
 }
 
-void angleTranslation (double *theta) {
+void angleTranslation (double *theta, float *alpha) {
 
 	int i;
 
 	for (i = 0; i < 3; ++i) {
-		if (theta[i] > 0.0) {
+		if (theta[i] >= 0.0) {
 			theta[i+3] = 180.0 - theta[i];
 		} else {
 			theta[i+3] = -180.0 - theta[i];
 		}
 	}
 
-	theta[1] -= 120.0;
-	theta[2] += 120.0;
-	theta[4] -= 120.0;
-	theta[5] += 120.0;
+	theta[1] -= 180.0 - alpha[1];
+	theta[2] += 180.0 - alpha[0];
+	theta[4] -= 180.0 - alpha[1];
+	theta[5] += 180.0 - alpha[0];
+
+	for (i = 0; i < 6; ++i) {
+		if (theta[i] > 180.0) {
+			theta[i] -= 360.0;
+		}
+		if (theta[i] < -180.0) {
+			theta[i] += 360.0;
+		}
+	}
+
+	return;
+}
+
+void angleTranslation (double *theta) {
+
+	int i;
+
+	for (i = 0; i < 3; ++i) {
+		if (theta[i] >= 0.0) {
+			theta[i+3] = 180.0 - theta[i];
+		} else {
+			theta[i+3] = -180.0 - theta[i];
+		}
+	}
+
+	theta[1] -= 120;
+	theta[2] += 120;
+	theta[4] -= 120;
+	theta[5] += 120;
 
 	for (i = 0; i < 6; ++i) {
 		if (theta[i] > 180.0) {

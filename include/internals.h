@@ -24,13 +24,12 @@
 
 #define RAD2DEG 57.295779513082323f		// useful to convert from radians to degrees
 #define GCC_STYLE 4						// 1: GCC, 2:GCC (frequency restrained), 3:GCC-PHAT, 4:GCC-PHAT (frequency restrained)
-#define GCC_TH 100.0f					// correlation threshold (to avoid false alarms)
+#define GCC_TH 140.0f					// correlation threshold (to avoid false alarms)
 #define REDUNDANCY_TH 20.0f				// redundancy threshold (for DOA estimation)
-#define DYNAMIC_GCC_TH 1				// enable a dynamic GCC threshold (0: disabled, 1: mean peak values, 2: max peak values)
+#define DYNAMIC_GCC_TH 0				// enable a dynamic GCC threshold (0: disabled, 1: mean peak values, 2: max peak values)
 #define MOVING_AVERAGE 1				// enable a moving average on kmeans centroids (0: disabled, 1: finite memory, 2: infinite memory)
 #define MOVING_FACTOR 1					// allow variations in DOA if the sources are moving (how many times the standard deviation)
 #define MEMORY_FACTOR 5				    // memory of the k-means algorithm
-#define mic_separation 0.23
 #define n_sources 4
 
 // Libsndfile:
@@ -50,7 +49,7 @@ double sample_rate;			            // sample rate [Hz]
 int nframes = 1024;				        // default number of frames per jack buffer
 unsigned int window_size, window_size_2, nframes_2;
 double c = 343.364;						// default sound speed [m/s]
-double dt_max, N_max;					// maximum delay between microphones [s, samples]
+double N_max[3];				        // maximum delay between microphones [samples]
 double doa;								// direction of arrival
 double mean_doa = 0.0;					// average direction of arrival
 double std_doa = 90.0;					// standard deviation of the direction of arrival
@@ -96,6 +95,10 @@ double **kalmanState;
 double **covMatrix;
 double initialState[2];
 
+float microphone_positions[6];
+float sides[3];
+float angles[3];
+
 char audio_file_path[1000];
 char output_file_path[1000];
 char text_file_path[20];
@@ -103,5 +106,6 @@ char text_kalman_path[20];
 
 void init(void);    // Initialize all internal registers, variables and memory allocation
 void process_audio (float*);
+void measure_array_geometry (float*, float*, float*);
 
 #endif

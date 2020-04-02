@@ -2,6 +2,8 @@ close all
 clear
 clc
 
+clean_corpus_txts
+
 main_path = '/home/lmiguelgato/Documents/DAP_project/corpus';
 
 files = dir();
@@ -9,7 +11,7 @@ dirFlags = [files.isdir] & ~strcmp({files.name},'.') & ~strcmp({files.name},'..'
 subFolders = files(dirFlags);
 
 for k = 1 : length(subFolders)
-    if ~strcmp(subFolders(k).name, 'Anechoic_Chamber_16')
+    if strcmp(subFolders(k).name, 'Anechoic_Chamber_16')
       cd(subFolders(k).name)
       files = dir();
       dirFlags = [files.isdir] & ~strcmp({files.name},'.') & ~strcmp({files.name},'..');

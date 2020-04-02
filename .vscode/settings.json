@@ -18,7 +18,9 @@
         "type_traits": "cpp",
         "utility": "cpp",
         "atomic": "cpp",
-        "cstdint": "cpp"
+        "cstdint": "cpp",
+        "iosfwd": "cpp",
+        "iostream": "cpp"
     },
     "terminal.integrated.shell.windows": "cmd.exe",
     "git.ignoreLimitWarning": true

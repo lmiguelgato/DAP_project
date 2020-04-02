@@ -16,6 +16,7 @@
 #include <random>
 #include <iostream>
 #include <fstream>
+#include <string>
 #include <iomanip>
 using namespace std;
 
@@ -30,6 +31,37 @@ int main (int argc, char *argv[]) {
 
 	if(argc != 2 && argc != 3){		
 		printf ("Usage:\ngcc_beamformer_offline <audio file path> <output path>\n");
+		exit(1);
+	}
+
+	string line;
+	ifstream settings_file ("./config/array_settings.txt");
+	if (settings_file.is_open())
+	{
+		getline (settings_file,line);
+		getline (settings_file,line);
+		microphone_positions[0] = stof(line);
+		getline (settings_file,line);
+		microphone_positions[1] = stof(line);
+
+		getline (settings_file,line);
+		getline (settings_file,line);
+		microphone_positions[2] = stof(line);
+		getline (settings_file,line);
+		microphone_positions[3] = stof(line);
+
+		getline (settings_file,line);
+		getline (settings_file,line);
+		microphone_positions[4] = stof(line);
+		getline (settings_file,line);
+		microphone_positions[5] = stof(line);
+
+		settings_file.close();
+
+		measure_array_geometry(microphone_positions, sides, angles);
+	}
+	else {
+		cout << "Unable to open settings file.\n";
 		exit(1);
 	}
 
@@ -113,9 +145,6 @@ int main (int argc, char *argv[]) {
 					in[i*n_in_channels + j] = recvsample_s / 32767.0f;
 				}
 			}
-			/*printf("%6.12f, ", in[i*n_in_channels + 0]);
-			printf("%6.12f, ", in[i*n_in_channels + 1]);
-			printf("%6.12f; \n", in[i*n_in_channels + 2]);*/
 		}
 		process_audio(in);
 	}
@@ -186,14 +215,14 @@ void process_audio (float *in){
 	double max_val12, max_val23, max_val31;
 
 	// find maximum of the cross-correlations, and estimate DOA:
-	double theta[6] = {asin(  unwrap(  max(X_gcc[1], window_size_2, N_max, &max_val12), nframes, N_max  )/N_max  )*RAD2DEG,
-					   asin(  unwrap(  max(X_gcc[2], window_size_2, N_max, &max_val23), nframes, N_max  )/N_max  )*RAD2DEG,
-					   asin(  unwrap(  max(X_gcc[0], window_size_2, N_max, &max_val31), nframes, N_max  )/N_max  )*RAD2DEG,
+	double theta[6] = {asin(  unwrap(  max(X_gcc[1], window_size_2, N_max[0], &max_val12), nframes, N_max[0]  )/N_max[0]  )*RAD2DEG,
+					   asin(  unwrap(  max(X_gcc[2], window_size_2, N_max[1], &max_val23), nframes, N_max[1]  )/N_max[1]  )*RAD2DEG,
+					   asin(  unwrap(  max(X_gcc[0], window_size_2, N_max[2], &max_val31), nframes, N_max[2]  )/N_max[2]  )*RAD2DEG,
 					   0.0,
 					   0.0,
 					   0.0};
 
-	angleTranslation(theta);	// use a coherent reference to measure DOA
+	angleTranslation(theta, angles);	// use a coherent reference to measure DOA
 
 	double thetaRedundant[3] = {0.0, 0.0, 0.0};
 
@@ -355,10 +384,35 @@ if (VERBOSE)
 	}
 }
 
+void measure_array_geometry (float* mic_pos, float* side, float* angle) {
+	float dx, dy;
+	float d12, d23, d31;
+
+	dx = mic_pos[0] - mic_pos[2];
+	dy = mic_pos[1] - mic_pos[3];
+	side[0] = sqrt( dx*dx + dy*dy );
+	d12 = side[0];
+
+	dx = mic_pos[2] - mic_pos[4];
+	dy = mic_pos[3] - mic_pos[5];
+	side[1] = sqrt( dx*dx + dy*dy );
+	d23 = side[1];
+
+	dx = mic_pos[4] - mic_pos[0];
+	dy = mic_pos[5] - mic_pos[1];
+	side[2] = sqrt( dx*dx + dy*dy );
+	d31 = side[2];
+
+	angle[0] = acos((d12*d12 + d31*d31 - d23*d23)/2/d12/d31);
+	angle[1] = acos((d12*d12 + d23*d23 - d31*d31)/2/d12/d23);
+	angle[2] = M_PI - angle[0] - angle[1];
+}
+
 void init(void) {
 
-	dt_max = mic_separation/c;
-	N_max = dt_max*sample_rate;
+	N_max[0] = sides[0]/c*sample_rate;
+	N_max[1] = sides[1]/c*sample_rate;
+	N_max[2] = sides[2]/c*sample_rate;
 
 	// obtain here the delay from user and store it in 'delay'
 	nframes_2   = nframes/2;

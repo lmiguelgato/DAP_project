@@ -7,6 +7,7 @@
 double state2angle (double* state);
 void angle2state (double angle, double* state);
 double angleRedundancy (double*, double*, double);
+void angleTranslation (double *, float *);
 void angleTranslation (double *);
 
 #endif

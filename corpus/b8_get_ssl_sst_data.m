@@ -31,11 +31,11 @@ for k = 1 : length(subFolders)
         thisPath = strcat(subFolders(k).name, '/', subFolders1(j).name, ...
             '/', subFolders2(i).name, '/', subFolders3(h).name);
         
-        Emin_ssl = 0.10;
+        Emin_ssl = 0.00;
         Emax_ssl = 1.00;
         
-        if ~isfile([main_path '/' thisPath '/ssl' num2str(Emin_ssl) ...
-                '-' num2str(Emax_ssl) '.mat'])
+        %if ~isfile([main_path '/' thisPath '/ssl' num2str(Emin_ssl) ...
+               % '-' num2str(Emax_ssl) '.mat'])
         
             clc
             disp(['Processing: ' thisPath])
@@ -48,24 +48,36 @@ for k = 1 : length(subFolders)
             x_ssl       = zeros(n_detections_ssl, n_sources_ssl);
             y_ssl       = zeros(n_detections_ssl, n_sources_ssl);
             theta_ssl   = zeros(n_detections_ssl, n_sources_ssl)+NaN;
+            E_ssl       = zeros(n_detections_ssl, n_sources_ssl);
 
             for i_detection = 1:n_detections_ssl
                 for i_source = 1:n_sources_ssl
                     this_E = ssl_data{i_detection}.src{i_source}.E;
+                    E_ssl(i_detection, i_source) = this_E;
 
                     if this_E > Emin_ssl && this_E < Emax_ssl
                         this_x = ssl_data{i_detection}.src{i_source}.x;
                         this_y = ssl_data{i_detection}.src{i_source}.y;
+                        
+                        this_theta = atan2(this_y, this_x);
 
-                        if this_x ~= 0
-                            this_theta = atan(this_y/this_x);
-                        else
-                            if this_y >= 0
-                                this_theta = pi/2;
-                            else
-                                this_theta = -pi/2;
-                            end
-                        end
+%                         if this_y ~= 0
+%                             if this_y > 0
+%                                 this_theta = atan(this_x/this_y);
+%                             else
+%                                 if this_x > 0
+%                                     this_theta = pi - atan(abs(this_x)/this_y);
+%                                 else
+%                                     this_theta = -pi + atan(abs(this_x)/this_y);
+%                                 end
+%                             end
+%                         else
+%                             if this_x >= 0
+%                                 this_theta = pi/2;
+%                             else
+%                                 this_theta = -pi/2;
+%                             end
+%                         end
 
                         x_ssl(i_detection, i_source)        = this_x;
                         y_ssl(i_detection, i_source)        = this_y;
@@ -75,9 +87,9 @@ for k = 1 : length(subFolders)
             end
 
             save([main_path '/' thisPath '/ssl' num2str(Emin_ssl) ...
-                '-' num2str(Emax_ssl) '.mat'], 'theta_ssl')
+                '-' num2str(Emax_ssl) '.mat'], 'theta_ssl', 'E_ssl')
             
-            if ~isfile([main_path '/' thisPath '/sst.mat'])
+            %if ~isfile([main_path '/' thisPath '/sst.mat'])
             
                 sst_data = loadjson([main_path '/' thisPath '/sst.json']);
 
@@ -132,9 +144,9 @@ for k = 1 : length(subFolders)
                     end
                     save([main_path '/' thisPath '/sst.mat'], 'sst_theta')
                 end
-            end
+            %end
             
-        end
+        %end
         
       end
       cd (strcat(main_path, '/', subFolders(k).name, '/', subFolders1(j).name))

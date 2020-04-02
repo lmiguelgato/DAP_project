@@ -25,7 +25,7 @@ max_abs_error_E10 = 10.0;
 max_abs_error_E15 = 15.0;
 
 for k = 1 : length(subFolders)
-    if ~strcmp(subFolders(k).name, 'Anechoic_Chamber_16')
+    if strcmp(subFolders(k).name, 'Anechoic_Chamber_16')
       cd(subFolders(k).name)
       files = dir();
       dirFlags = [files.isdir] & ~strcmp({files.name},'.') & ~strcmp({files.name},'..');
@@ -110,32 +110,48 @@ for k = 1 : length(subFolders)
                         num_detections_E15 = 0;
 
                         if ~isempty(E15)
-                            mae15 = mae15 + mean(abs(theta_original(isources)-theta_ssl(E15)));
-                            rms15 = rms15 + sqrt(sum((theta_original(isources)-theta_ssl(E15)).^2)/length(E15));
+%                             mae15 = mae15 + mean(abs(theta_original(isources)-theta_ssl(E15)));
+                            mae15 = mean(abs(theta_original(isources)-theta_ssl(E15)));
+%                             rms15 = rms15 + sqrt(var(theta_original(isources)-theta_ssl(E15)));
+%                             rms15 = rms15 + sqrt(sum((theta_original(isources)-theta_ssl(E15)).^2)/length(E15));
+                            rms15 = sqrt(sum((theta_original(isources)-theta_ssl(E15)).^2)/length(E15));
                             num_detections_E15 = num_detections_E15 + length(E15);
                             false_alarm(E15) = 0;
 
                             if ~isempty(E10)
                                 num_detections_E10 = num_detections_E10 + length(E10);
                                 num_detections_E15 = num_detections_E15 - num_detections_E10;
-                                mae10 = mae10 + mean(abs(theta_original(isources)-theta_ssl(E10)));
-                                rms10 = rms10 + sqrt(sum((theta_original(isources)-theta_ssl(E10)).^2)/length(E10));
+%                                 mae10 = mae10 + mean(abs(theta_original(isources)-theta_ssl(E10)));
+                                mae10 = mean(abs(theta_original(isources)-theta_ssl(E10)));
+%                                 rms10 = rms10 + sqrt(var(theta_original(isources)-theta_ssl(E10)));
+%                                 rms10 = rms10 + sqrt(sum((theta_original(isources)-theta_ssl(E10)).^2)/length(E10));
+                                rms10 = sqrt(sum((theta_original(isources)-theta_ssl(E10)).^2)/length(E10));
 
                                 if ~isempty(E5)
                                     num_detections_E5 = num_detections_E5 + length(E5);
                                     num_detections_E10 = num_detections_E10 - num_detections_E5;
-                                    mae5 = mae5 + mean(abs(theta_original(isources)-theta_ssl(E5)));
-                                    rms5 = rms5 + sqrt(sum((theta_original(isources)-theta_ssl(E5)).^2)/length(E5));
+%                                     mae5 = mae5 + mean(abs(theta_original(isources)-theta_ssl(E5)));
+                                    mae5 = mean(abs(theta_original(isources)-theta_ssl(E5)));
+%                                     rms5 = rms5 + sqrt(var(theta_original(isources)-theta_ssl(E5)));
+%                                     rms5 = rms5 + sqrt(sum((theta_original(isources)-theta_ssl(E5)).^2)/length(E5));
+                                    rms5 = sqrt(sum((theta_original(isources)-theta_ssl(E5)).^2)/length(E5));
                                 end
                             end
 
-                            e15 = e15 + num_detections_E15/(num_detections_E15 + num_detections_E10 + num_detections_E5)*100;
-                            e10 = e10 + num_detections_E10/(num_detections_E15 + num_detections_E10 + num_detections_E5)*100;
-                            e5 = e5 + num_detections_E5/(num_detections_E15 + num_detections_E10 + num_detections_E5)*100;
+%                             e15 = e15 + num_detections_E15/(num_detections_E15 + num_detections_E10 + num_detections_E5)*100;
+%                             e10 = e10 + num_detections_E10/(num_detections_E15 + num_detections_E10 + num_detections_E5)*100;
+%                             e5 = e5 + num_detections_E5/(num_detections_E15 + num_detections_E10 + num_detections_E5)*100;
+
+                            e15 = num_detections_E15/(num_detections_E15 + num_detections_E10 + num_detections_E5)*100;
+                            e10 = num_detections_E10/(num_detections_E15 + num_detections_E10 + num_detections_E5)*100;
+                            e5 = num_detections_E5/(num_detections_E15 + num_detections_E10 + num_detections_E5)*100;
 
                             total_detections_E5 = total_detections_E5 + num_detections_E5;
                             total_detections_E10 = total_detections_E10 + num_detections_E10;
                             total_detections_E15 = total_detections_E15 + num_detections_E15;
+                            
+                            tmp = [k, j, i, mae15, mae10, mae5, rms15, rms10, rms5, e15, e10, e5, nsources];
+                            all_data = [all_data; tmp];
                         else
                             n_missed_detections = n_missed_detections+1;
                         end
@@ -147,8 +163,8 @@ for k = 1 : length(subFolders)
 
                     mm = nsources;
                     if some_source
-                    tmp = [k, j, i, mae15/mm, mae10/mm, mae5/mm, rms15/mm, rms10/mm, rms5/mm, e15/mm, e10/mm, e5/mm, nsources];
-                    all_data = [all_data; tmp];
+%                     tmp = [k, j, i, mae15/mm, mae10/mm, mae5/mm, rms15/mm, rms10/mm, rms5/mm, e15/mm, e10/mm, e5/mm, nsources];
+%                     all_data = [all_data; tmp];
                     else
                     no_data = [no_data; [k, j, i, h]];
                     end
@@ -340,18 +356,10 @@ clc
 
 mm = size(all_data, 1);
 
-mean_mae15  = sum(all_data(:, 4))/mm;
-mean_mae10  = sum(all_data(:, 5))/(mm-no_10);
-mean_mae5   = sum(all_data(:, 6))/(mm-no_5);
-mean_rms15  = sum(all_data(:, 7))/mm;
-mean_rms10  = sum(all_data(:, 8))/(mm-no_10);
-mean_rms5   = sum(all_data(:, 9))/(mm-no_5);
-mean_e15    = mean(all_data(:, 10));
-mean_e10    = mean(all_data(:, 11));
-mean_e5     = mean(all_data(:, 12));
-
-mean_mae15_1s  = mean(all_data(all_data(:, 13) == 1, 4));
+    mean_mae15_1s  = mean(all_data(all_data(:, 13) == 1, 4));
     mean_rms15_1s  = mean(all_data(all_data(:, 13) == 1, 7));
+%     mean_rms15_1s  = expectedValue(all_data(all_data(:, 13) == 1, 7));
+    
     mean_e15_1s    = 100*sum(all_data(all_data(:, 13) == 1, 10))/(sum(all_data(all_data(:, 13) == 1, 10))+sum(all_data(all_data(:, 13) == 1, 11))+sum(all_data(all_data(:, 13) == 1, 12)));
     mean_e10_1s    = 100*sum(all_data(all_data(:, 13) == 1, 11))/(sum(all_data(all_data(:, 13) == 1, 10))+sum(all_data(all_data(:, 13) == 1, 11))+sum(all_data(all_data(:, 13) == 1, 12)));
     mean_e5_1s     = 100*sum(all_data(all_data(:, 13) == 1, 12))/(sum(all_data(all_data(:, 13) == 1, 10))+sum(all_data(all_data(:, 13) == 1, 11))+sum(all_data(all_data(:, 13) == 1, 12)));
@@ -361,6 +369,7 @@ mean_mae15_1s  = mean(all_data(all_data(:, 13) == 1, 4));
 
     mean_mae15_2s  = mean(all_data(all_data(:, 13) == 2, 4));
     mean_rms15_2s  = mean(all_data(all_data(:, 13) == 2, 7));
+%     mean_rms15_2s  = expectedValue(all_data(all_data(:, 13) == 2, 7));
     mean_e15_2s    = 100*sum(all_data(all_data(:, 13) == 2, 10))/(sum(all_data(all_data(:, 13) == 2, 10))+sum(all_data(all_data(:, 13) == 2, 11))+sum(all_data(all_data(:, 13) == 2, 12)));
     mean_e10_2s    = 100*sum(all_data(all_data(:, 13) == 2, 11))/(sum(all_data(all_data(:, 13) == 2, 10))+sum(all_data(all_data(:, 13) == 2, 11))+sum(all_data(all_data(:, 13) == 2, 12)));
     mean_e5_2s     = 100*sum(all_data(all_data(:, 13) == 2, 12))/(sum(all_data(all_data(:, 13) == 2, 10))+sum(all_data(all_data(:, 13) == 2, 11))+sum(all_data(all_data(:, 13) == 2, 12)));
@@ -368,12 +377,14 @@ mean_mae15_1s  = mean(all_data(all_data(:, 13) == 1, 4));
 
     mean_mae15_3s  = mean(all_data(all_data(:, 13) == 3, 4));
     mean_rms15_3s  = mean(all_data(all_data(:, 13) == 3, 7));
+%     mean_rms15_3s  = expectedValue(all_data(all_data(:, 13) == 3, 7));
     mean_e15_3s    = 100*sum(all_data(all_data(:, 13) == 3, 10))/(sum(all_data(all_data(:, 13) == 3, 10))+sum(all_data(all_data(:, 13) == 3, 11))+sum(all_data(all_data(:, 13) == 3, 12)));
     mean_e10_3s    = 100*sum(all_data(all_data(:, 13) == 3, 11))/(sum(all_data(all_data(:, 13) == 3, 10))+sum(all_data(all_data(:, 13) == 3, 11))+sum(all_data(all_data(:, 13) == 3, 12)));
     mean_e5_3s     = 100*sum(all_data(all_data(:, 13) == 3, 12))/(sum(all_data(all_data(:, 13) == 3, 10))+sum(all_data(all_data(:, 13) == 3, 11))+sum(all_data(all_data(:, 13) == 3, 12)));
 
     mean_mae15_4s  = mean(all_data(all_data(:, 13) == 4, 4));
     mean_rms15_4s  = mean(all_data(all_data(:, 13) == 4, 7));
+%     mean_rms15_4s  = expectedValue(all_data(all_data(:, 13) == 4, 7));
     mean_e15_4s    = 100*sum(all_data(all_data(:, 13) == 4, 10))/(sum(all_data(all_data(:, 13) == 4, 10))+sum(all_data(all_data(:, 13) == 4, 11))+sum(all_data(all_data(:, 13) == 4, 12)));
     mean_e10_4s    = 100*sum(all_data(all_data(:, 13) == 4, 11))/(sum(all_data(all_data(:, 13) == 4, 10))+sum(all_data(all_data(:, 13) == 4, 11))+sum(all_data(all_data(:, 13) == 4, 12)));
     mean_e5_4s     = 100*sum(all_data(all_data(:, 13) == 4, 12))/(sum(all_data(all_data(:, 13) == 4, 10))+sum(all_data(all_data(:, 13) == 4, 11))+sum(all_data(all_data(:, 13) == 4, 12)));
