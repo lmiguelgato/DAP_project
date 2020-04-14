@@ -81,10 +81,12 @@ for k = 1 : length(subFolders)
                     if fileID ~= -1
                         some_source = true;
                         C = textscan(fileID,'%s',1,'delimiter','\n', 'headerlines',3);
-                        mae15 = mae15 + sscanf(C{1}{1},'mean absolute error up to 15 degrees in error: %f');
+    %                     mae15 = mae15 + sscanf(C{1}{1},'mean absolute error up to 15 degrees in error: %f');
+                        mae15 = sscanf(C{1}{1},'mean absolute error up to 15 degrees in error: %f');
                         frewind(fileID)
                         C = textscan(fileID,'%s',1,'delimiter','\n', 'headerlines',4);
-                        rms15 = rms15 + sscanf(C{1}{1},'RMS error up to 15 degrees in error: %f');
+    %                     rms15 = rms15 + sscanf(C{1}{1},'RMS error up to 15 degrees in error: %f');
+                        rms15 = sscanf(C{1}{1},'RMS error up to 15 degrees in error: %f');
                         frewind(fileID)
                         C = textscan(fileID,'%s',1,'delimiter','\n', 'headerlines',8);
                         tmp = sscanf(C{1}{1},'mean absolute error up to 10 degrees in error: %f');
@@ -92,14 +94,16 @@ for k = 1 : length(subFolders)
                             no_10 = no_10 + 1;
                             tmp = 0.0;
                         end
-                        mae10 = mae10 + tmp;
+    %                     mae10 = mae10 + tmp;
+                        mae10 = tmp;
                         frewind(fileID)
                         C = textscan(fileID,'%s',1,'delimiter','\n', 'headerlines',9);
                         tmp = sscanf(C{1}{1},'RMS error up to 10 degrees in error: %f');
                         if tmp == -1.0
                             tmp = 0.0;
                         end
-                        rms10 = rms10 + tmp;
+    %                     rms10 = rms10 + tmp;
+                        rms10 = tmp;
                         frewind(fileID)
                         C = textscan(fileID,'%s',1,'delimiter','\n', 'headerlines',13);
                         tmp = sscanf(C{1}{1},'mean absolute error up to 5 degrees in error: %f');
@@ -107,30 +111,46 @@ for k = 1 : length(subFolders)
                             no_5 = no_5 + 1;
                             tmp = 0.0;
                         end
-                        mae5 = mae5 + tmp;
+    %                     mae5 = mae5 + tmp;
+                        mae5 = tmp;
                         frewind(fileID)
                         C = textscan(fileID,'%s',1,'delimiter','\n', 'headerlines',14);
                         tmp = sscanf(C{1}{1},'RMS error up to 5 degrees in error: %f');
                         if tmp == -1.0
                             tmp = 0.0;
                         end
-                        rms5 = rms5 + tmp;
+    %                     rms5 = rms5 + tmp;
+                        rms5 = tmp;
                         frewind(fileID)
-                        C = textscan(fileID,'%s',1,'delimiter','\n', 'headerlines',16);
-                        e15 = e15 + sscanf(C{1}{1},'E15 metric: %f');
+                        C = textscan(fileID,'%s',1,'delimiter','\n', 'headerlines',1);
+    %                     e15 = e15 + sscanf(C{1}{1},'number of detections up to 15 degrees in error: %u');
+                        e15 = sscanf(C{1}{1},'number of detections up to 15 degrees in error: %u');
                         frewind(fileID)
-                        C = textscan(fileID,'%s',1,'delimiter','\n', 'headerlines',17);
-                        e10 = e10 + sscanf(C{1}{1},'E10 metric: %f');
+                        C = textscan(fileID,'%s',1,'delimiter','\n', 'headerlines',6);
+    %                     e10 = e10 + sscanf(C{1}{1},'number of detections up to 10 degrees in error: %u');
+                        e10 = sscanf(C{1}{1},'number of detections up to 10 degrees in error: %u');
                         frewind(fileID)
-                        C = textscan(fileID,'%s',1,'delimiter','\n', 'headerlines',18);
-                        e5 = e5 + sscanf(C{1}{1},'E5 metric: %f');
+                        C = textscan(fileID,'%s',1,'delimiter','\n', 'headerlines',11);
+    %                     e5 = e5 + sscanf(C{1}{1},'number of detections up to 5 degrees in error: %u');
+                        e5 = sscanf(C{1}{1},'number of detections up to 5 degrees in error: %u');
+    %                     C = textscan(fileID,'%s',1,'delimiter','\n', 'headerlines',16);
+    %                     e15 = e15 + sscanf(C{1}{1},'E15 metric: %f');
+    %                     frewind(fileID)
+    %                     C = textscan(fileID,'%s',1,'delimiter','\n', 'headerlines',17);
+    %                     e10 = e10 + sscanf(C{1}{1},'E10 metric: %f');
+    %                     frewind(fileID)
+    %                     C = textscan(fileID,'%s',1,'delimiter','\n', 'headerlines',18);
+    %                     e5 = e5 + sscanf(C{1}{1},'E5 metric: %f');
                         fclose(fileID);
+                        tmp = [k, j, i, mae15, mae10, mae5, rms15, rms10, rms5, e15-e10, e10-e5, e5, nsources];
+                        all_data = [all_data; tmp];
                     end
                   end
                   mm = nsources;
                   if some_source
-                    tmp = [k, j, i, mae15/mm, mae10/mm, mae5/mm, rms15/mm, rms10/mm, rms5/mm, e15/mm, e10/mm, e5/mm, nsources];
-                    all_data = [all_data; tmp];
+    %                 tmp = [k, j, i, mae15/mm, mae10/mm, mae5/mm, rms15/mm, rms10/mm, rms5/mm, e15/mm, e10/mm, e5/mm, nsources];
+    %                 tmp = [k, j, i, mae15/mm, mae10/mm, mae5/mm, rms15/mm, rms10/mm, rms5/mm, e15, e10, e5, nsources];
+    %                 all_data = [all_data; tmp];
                   else
                     no_data = [no_data; [k, j, i, h]];
                   end
