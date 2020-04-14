@@ -40,6 +40,10 @@ int main (int argc, char *argv[]) {
 	{
 		getline (settings_file,line);
 		getline (settings_file,line);
+		gcc_th = stof(line);
+
+		getline (settings_file,line);
+		getline (settings_file,line);
 		microphone_positions[0] = stof(line);
 		getline (settings_file,line);
 		microphone_positions[1] = stof(line);
@@ -55,6 +59,30 @@ int main (int argc, char *argv[]) {
 		microphone_positions[4] = stof(line);
 		getline (settings_file,line);
 		microphone_positions[5] = stof(line);
+
+		getline (settings_file,line);
+		getline (settings_file,line);
+		gcc_style = stof(line);
+
+		getline (settings_file,line);
+		getline (settings_file,line);
+		redundancy = stof(line);
+
+		getline (settings_file,line);
+		getline (settings_file,line);
+		dyn_thresh = stof(line);
+
+		getline (settings_file,line);
+		getline (settings_file,line);
+		km_mov_average = stof(line);
+
+		getline (settings_file,line);
+		getline (settings_file,line);
+		km_memory = stof(line);
+
+		getline (settings_file,line);
+		getline (settings_file,line);
+		km_movement = stof(line);
 
 		settings_file.close();
 
@@ -190,13 +218,13 @@ void process_audio (float *in){
 
 	// 3- multiply pairs of FFTs (time reversing one of them), and
 	// 4- apply iFFT
-	phat (o_fft_2N, X_gcc[0], X_gcc[1], window_size_2, kmin, kmax, GCC_STYLE);
+	phat (o_fft_2N, X_gcc[0], X_gcc[1], window_size_2, kmin, kmax, gcc_style);
 	fftw_execute(o_inverse_2N);
 
 	for (i = 0; i < window_size_2; ++i)
 		Aux_gcc[i] = o_time_2N[i];
 
-	phat (o_fft_2N, X_gcc[1], X_gcc[2], window_size_2, kmin, kmax, GCC_STYLE);
+	phat (o_fft_2N, X_gcc[1], X_gcc[2], window_size_2, kmin, kmax, gcc_style);
 	fftw_execute(o_inverse_2N);
 
 	for (i = 0; i < window_size_2; ++i) {
@@ -204,7 +232,7 @@ void process_audio (float *in){
 		Aux_gcc[i] = o_time_2N[i];
 	}
 
-	phat (o_fft_2N, X_gcc[2], X_gcc[0], window_size_2, kmin, kmax, GCC_STYLE);
+	phat (o_fft_2N, X_gcc[2], X_gcc[0], window_size_2, kmin, kmax, gcc_style);
 	fftw_execute(o_inverse_2N);
 
 	for (i = 0; i < window_size_2; ++i) {
@@ -226,15 +254,15 @@ void process_audio (float *in){
 
 	double thetaRedundant[3] = {0.0, 0.0, 0.0};
 
-	doa = angleRedundancy (theta, thetaRedundant, REDUNDANCY_TH);
+	doa = angleRedundancy (theta, thetaRedundant, redundancy);
 
 	double max_mean, max_max;
 
-	switch (DYNAMIC_GCC_TH) { //enable a dynamic GCC threshold
+	switch (dyn_thresh) { //enable a dynamic GCC threshold
 		case 1:	// mean peak values
 			max_mean = (max_val12 + max_val23 + max_val31)/3;
 
-			if (max_mean > GCC_TH) {
+			if (max_mean > gcc_th) {
 				++ccounter;
 				//gcc_th = (gcc_th*ccounter + max_mean)/(ccounter+1);
 				gcc_th = max_mean;
@@ -328,9 +356,9 @@ if (VERBOSE)
 						kalman (measurement, state, cov);
 
 						outputKalman << DOA_class[icounter%hist_length] << ' ';
-						outputKalman << setprecision(2) << DOA_hist[icounter%hist_length];			// save results into text file
+						outputKalman << setprecision(4) << DOA_hist[icounter%hist_length];			// save results into text file
 						outputKalman << ' ';
-						outputKalman << setprecision(2) << state2angle (state);			// save results into text file
+						outputKalman << setprecision(5) << state2angle (state);			// save results into text file
 						outputKalman << endl;
 
 						kalmanState[0][i] = state[0];	kalmanState[1][i] = state[1];	kalmanState[2][i] = state[2];	kalmanState[3][i] = state[3];
@@ -346,7 +374,7 @@ if (VERBOSE)
 				if (counter[i] > 0) {	// any DOA in this cluster?
 					++dcounter[i];
 
-					if (MOVING_AVERAGE == 2) { //enable moving average
+					if (km_mov_average == 2) { //enable moving average
 						DOA_mean[i] = (DOA_mean[i]*(dcounter[i]-1) + DOA_kmean[i])/dcounter[i];		// moving average
 						DOA_stdev[i] += pow(DOA_kmean[i]-DOA_mean[i], 2);							// standard deviation
 					} else {
@@ -354,9 +382,9 @@ if (VERBOSE)
 						DOA_stdev[i] += pow(DOA_kmean[i]-DOA_mean[i], 2);							// standard deviation
 					}
 
-					if (abs(DOA_kmean[i]-DOA_mean[i]) < MOVING_FACTOR*sqrt(DOA_stdev[i]/dcounter[i])) {		// avoid outsiders
+					if (abs(DOA_kmean[i]-DOA_mean[i]) < km_movement*sqrt(DOA_stdev[i]/dcounter[i])) {		// avoid outsiders
 						++ecounter[i];
-						if (MOVING_AVERAGE == 0) {
+						if (km_mov_average == 0) {
 							DOA_valid[i] = DOA_kmean[i];
 						} else {
 							DOA_valid[i] = DOA_mean[i];
@@ -365,7 +393,7 @@ if (VERBOSE)
 {
 						printf("DOA[%d] = %1.1f\n", i, DOA_valid[i]);
 }
-						outputFile << setprecision(2) << DOA_valid[i];			// save results into text file
+						outputFile << setprecision(4) << DOA_valid[i];			// save results into text file
 					}
 
 				} else {
@@ -423,7 +451,7 @@ void init(void) {
 
 	fRes = 2.0*M_PI/window_size;
 
-	hist_length = MEMORY_FACTOR*n_sources;
+	hist_length = km_memory*n_sources;
 
 	// initialization of internal buffers
 	// - overlap-add buffers

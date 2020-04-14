@@ -24,7 +24,7 @@
 
 #define RAD2DEG 57.295779513082323f		// useful to convert from radians to degrees
 #define GCC_STYLE 4						// 1: GCC, 2:GCC (frequency restrained), 3:GCC-PHAT, 4:GCC-PHAT (frequency restrained)
-#define GCC_TH 140.0f					// correlation threshold (to avoid false alarms)
+#define GCC_TH 120.0f					// correlation threshold (to avoid false alarms)
 #define REDUNDANCY_TH 20.0f				// redundancy threshold (for DOA estimation)
 #define DYNAMIC_GCC_TH 0				// enable a dynamic GCC threshold (0: disabled, 1: mean peak values, 2: max peak values)
 #define MOVING_AVERAGE 1				// enable a moving average on kmeans centroids (0: disabled, 1: finite memory, 2: infinite memory)
@@ -55,6 +55,12 @@ double mean_doa = 0.0;					// average direction of arrival
 double std_doa = 90.0;					// standard deviation of the direction of arrival
 double std_cum = 90.0;					// standard deviation of the direction of arrival (cummulative)
 double gcc_th = GCC_TH;					// default GCC threshold
+int gcc_style = GCC_STYLE;			
+double redundancy = REDUNDANCY_TH;	
+int dyn_thresh = DYNAMIC_GCC_TH;			
+int km_mov_average = MOVING_AVERAGE;		
+int km_memory = MEMORY_FACTOR;			
+double km_movement = MOVING_FACTOR;	
 double fRes; 							// frequency resolution
 
 double f_min = 1000.0;					// minimum frequency of the desired signal [Hz]
