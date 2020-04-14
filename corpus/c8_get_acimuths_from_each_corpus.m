@@ -4,7 +4,7 @@ clc
 
 clean_corpus_txts
 
-Emin_ssl = 0.050;    % for Pfa = 0.10: 0.050  total, 0.049 reverb, 0.050 anech
+Emin_ssl = 0.049;    % for Pfa = 0.10: 0.050  total, 0.049 reverb, 0.050 anech
 Emax_ssl = 1.00;
 
 addpath('jsonlab')
@@ -19,7 +19,7 @@ max_abs_error_E10 = 10.0;
 max_abs_error_E15 = 15.0;
 
 for k = 1 : length(subFolders)
-%     if strcmp(subFolders(k).name, 'Anechoic_Chamber_16')
+    if ~strcmp(subFolders(k).name, 'Anechoic_Chamber_16')
         cd(subFolders(k).name)
         files = dir();
         dirFlags = [files.isdir] & ~strcmp({files.name},'.') & ~strcmp({files.name},'..');
@@ -165,5 +165,7 @@ for k = 1 : length(subFolders)
             cd ('..')
         end
         cd ('..')
-%     end
+    end
 end
+
+d8_get_all_statistics

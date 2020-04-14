@@ -7,7 +7,7 @@ clean_corpus_txts
 main_path = '/home/lmiguelgato/Documents/DAP_project/corpus';
 
 files = dir();
-dirFlags = [files.isdir] & ~strcmp({files.name},'.') & ~strcmp({files.name},'..');
+dirFlags = [files.isdir] & ~strcmp({files.name},'.') & ~strcmp({files.name},'..') & ~strcmp({files.name},'jsonlab') & ~strcmp({files.name},'config');
 subFolders = files(dirFlags);
 
 for k = 1 : length(subFolders)
@@ -42,3 +42,5 @@ for k = 1 : length(subFolders)
       cd ('..')
     end
 end
+
+d_get_gcc_all_statistics
