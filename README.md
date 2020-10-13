@@ -1,7 +1,7 @@
 # Robot audition system
 ## Location and tracking of multiple speakers using an array of 3 microphones
-- Estimate the directions of arrival (DOA) of multiple speakers from a set of recordings.
-- Spatial filtering to improve the signal-to-interference ratio.
+- Estimate the directions of arrival (DOA) of multiple speakers in real-time (or from a set of recordings).
+- Spatial filtering to improve the signal-to-interference ratio (simple delay-and-sum beamforming).
 
 Requirements:
 - libsndfile (version 1.0.28 or higher)
