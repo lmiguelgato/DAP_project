@@ -1,4 +1,5 @@
-## Robotic audition system
+## Robot audition system
+# Location and tracking of multiple speakers using an array of 3 microphones
 - Estimate the directions of arrival (DOA) of multiple speakers from a set of recordings.
 - Spatial filtering to improve the signal-to-interference ratio.
 
